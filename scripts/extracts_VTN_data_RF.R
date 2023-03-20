@@ -5,7 +5,8 @@ library(pdftools)
 library(dplyr)
 library(tidyr)
 library(stringr)
-#install.packages("tabulizer")
+# devtools::install_github("ropensci/tabulizer")
+# library(tabulizer)
 library(tidyverse)
 library(readr)
 #-------------------------------------------------------------------------------
@@ -38,84 +39,153 @@ dir.create(dest)
 download.file(url = url,destfile = file.path(dest,"VTN_",anos,".pdf"),mode = "wb")
 
 
-download.file(url = url19_21,destfile = paste0(dest,"/VTN_",anos,".pdf"),mode = "wb")
+download.file(url = url19_21,destfile = paste0(dest,"/VTN_",anos,".pdf")
+                                               ,mode = "wb")
 
 ################################################################################
 #lendo pdf e transformando em data frame
 ################################################################################
 
-# funcao pra estados que tem vtn unico (so funciona pra 2022). pros outros tem q alterar o table start e end. testei adicionar como condicional
-# nao deu certo ainda. O nome das colunas e o nome dos municipios muda em cada ano!
+# funcao pra estados que tem vtn unico (pra 2020 nao esta funcionando)
 
-# na planilha de 2019 comeca com um estado q tem os dados em colunas, depois tem apenas 1 com uma coluna so, depois retoma. teria q melhorar o script pra gerar condicionais pra q isso funcione pra todos os anos.
-# nao consigo fazer funcionar pra todos os anos. acho q o jeito é fazer diferente pra cada ano mesmo ou usar uns if else.
-
-get_table <- function(raw) {
+get_table <- function(raw,ano) {
+  
   raw <- map(raw,~str_split(.x,"\\n") %>%unlist())
   raw <- reduce(raw,c)
   
-  # esse funciona pra 2022
-  table_start <- stringr::str_which(tolower(raw),"nome município")
-  table_end <- stringr::str_which(tolower(raw),"urucurituba")
-  # teria q ser assim pra 2019
-  # table_start <- stringr::str_which(tolower(raw),"nome município|abaiara")
-  # table_end <- stringr::str_which(tolower(raw),"urucurituba|viçosa do ceará")
-    table_end <- table_end[min(which(table_end>table_start))]
+  if (ano == 2022|ano==2021) {
+    # define a pagina de inicio e de fim dos dados (grep tb funcionaria)
+    table_start <- stringr::str_which(tolower(raw),"alvaraes")
+    table_end <- stringr::str_which(tolower(raw),"urucurituba")
+    }
+  if (ano == 2019|ano==2020){
+    
+    if (ano == 2019) {
+      i="abaiara"
+      f = "viçosa do ceará"
+      table_start <- stringr::str_which(tolower(raw),i)
+      table_end <- stringr::str_which(tolower(raw),f)
+    }else{
+      
+      next
+      # essa funcao nao esta funcionando pq o pdf_text nao funciona com esse de 2020 - rever 
+      # Define as páginas onde a tabela começa e termina
+      # table_start <- stringr::str_which(tolower(raw), "uf\nac")
+      # table_end <- stringr::str_which(tolower(raw), "uniao do norte")
+      
+      }
+    }
   
+  table_end <- table_end[min(which(table_end>table_start))]
   # build the table and remove special characters
   table <- raw[(table_start): (table_end)]
   table <- str_replace_all(table,"\\s{2,}","|")
   table <- str_replace_all(table,":","|")
   text_con <- textConnection(table)
-  data.table <- read.csv(text_con,sep="|")
-  
-  # create a list of column names
-  
-  colnames(data.table) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Fonte")
+  data.table <- read.csv(text_con,sep="|",header = F)
+  # definindo nome das colunas
+  colnames(data.table) <- c("Nome Município","Obs","VTN","Fonte")
+  # output da funcao
   data.table
 }
 
 
 # funcao pra estados que tem vtn discriminado por uso
+# falta 2020, q nao da certo tb
 
 get_table2 <- function(raw) {
+  
   raw <- map(raw,~str_split(.x,"\\n") %>%unlist())
   raw <- reduce(raw,c)
-  
-  table_start <- stringr::str_which(tolower(raw),"nome município")
-  table_end <- stringr::str_which(tolower(raw),"tupiratins")
-  table_end <- table_end[min(which(table_end>table_start))]
-  
-  # build the table and remove special characters
-  table <- raw[(75): (table_end)]
-  table <- str_replace_all(table,"\\s{3,}","|")
-  table <- table[4:length(table)]
-  table <- str_replace_all(table,"s/i","|")
-  text_con <- textConnection(table)
-  data.table <- read.csv(text_con,sep="|")
-  
-  # create a list of column names
-  df <- colnames(data.table)
-  df <- gsub(pattern = "X",replacement = "",x = df)
-  data.table <- rbind(df,data.table)
-  colnames(data.table) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+  if (ano == 2022){
+    table_start <- stringr::str_which(tolower(raw),"alcobaca")
+    table_end <- stringr::str_which(tolower(raw),"tupiratins")
+    table_end <- table_end[min(which(table_end>table_start))]
+    # build the table and remove special characters
+    table <- raw[(table_start): (table_end)]
+    ## simbolo "\\s = any white spates
+    # substitui 2 espacos por |
+    table <- str_replace_all(table,"\\s{2,}","|")
+    # separad oq falta, s/informacao por | tb
+    table <- str_replace_all(table," s","|")
+    # concerta qndo so tem um espaco entre penultima coluna e o valor da coluna fonte
+    table <- str_replace_all(table," 1","|")
+    text_con <- textConnection(table)
+    data.table <- read.csv(text_con,sep="|",header = F)
+    colnames(data.table) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+    
+  }
+  if (ano == 2021){
+    table_start <- stringr::str_which(tolower(raw),"alcobaca")
+    table_end <- stringr::str_which(tolower(raw),"xambioa")
+    table_end <- table_end[min(which(table_end>table_start))]
+    # build the table and remove special characters
+    table <- raw[(table_start): (table_end)]
+    ## simbolo "\\s = any white spates
+    # substitui 2 espacos por |
+    table <- str_replace_all(table,"\\s{2,}","|")
+    # separad oq falta, s/informacao por | tb
+    table <- str_replace_all(table," s","|")
+    # concerta qndo so tem um espaco entre penultima coluna e o valor da coluna fonte
+    table <- str_replace_all(table," 1","|")
+    text_con <- textConnection(table)
+    data.table <- read.csv(text_con,sep="|",header = F)
+    colnames(data.table) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+    data.table
+  }
+  if (ano == 2019){
+    table_start <- stringr::str_which(tolower(raw),"baianópolis")
+    table_end <- stringr::str_which(tolower(raw),"tupirama")
+    table_end <- table_end[min(which(table_end>table_start))]
+    # build the table and remove special characters
+    table <- raw[(table_start): (table_end)]
+    ## simbolo "\\s = any white spates
+    # substitui 2 espacos por |
+    table <- str_replace_all(table,"\\s{2,}","|")
+    # separad oq falta, s/informacao por | tb
+    table <- str_replace_all(table," s","|")
+    # concerta qndo so tem um espaco entre penultima coluna e o valor da coluna fonte
+    table <- str_replace_all(table," 1","|")
+    text_con <- textConnection(table)
+    data.table <- read.csv(text_con,sep="|",header = F)
+    # excluir dados do CE
+    i <- which(data.table$V2=="CEARÁ - CE") 
+    f <- which(data.table$V1=="VIÇOSA DO CEARÁ")
+    #data.table <- data.table %>%
+    exclude <- data.table%>% slice(i:f)
+    exclude$ID <- paste0(exclude$V1,exclude$V2)
+    data.table2 <- data.table%>%
+      mutate(ID=paste0(V1,V2)) %>%
+      filter(!ID %in% exclude$ID)%>%
+      select(-ID)
+    colnames(data.table2) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+    data.table <- data.table2
+  }
   data.table
 }
 
 
 
+anos <- c(2019,2021,2022)
 
+UFs_valor_unico <- c("CEARA - CE","AMAZONAS - AM","AMAZONAS - AM") 
+
+contador <- 1
 
 for(ano in anos){
 
+# por enquanto essa parte aqui funciona com 2022, nao sei se funcionaria com os outros. 
 #txt <- pdf_text(pdf ="data/VTN_2022.pdf")
 
 txt <- pdf_text(pdf =paste0("data/VTN_",ano,".pdf"))
 
 #raw_text <- map("data/VTN_2022.pdf", txt)
-df_vtn_unico <- get_table(raw = txt)[c(-1,-2),1:3]
-names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
-df_vtn_unico$UF <- "AMAZONAS - AM"
+
+df_vtn_unico <- get_table(raw = txt,ano = ano)
+
+#names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
+
+df_vtn_unico$UF <- UFs_valor_unico[contador]
 
 df_vtn_aptidao <- get_table2(raw = txt)
 
@@ -138,7 +208,9 @@ df <- df_vtn_aptidao
 
 uf <- ufs$uf
 uf2 <- uf[2:18]# sem bahia
+# repete tocantins
 uf2[18] <- uf2[17]
+
 # ficou faltando soh tocantis! teria q dar um jeito de encaixar! colocar um tocantins repetido
 
 for (i in 1:nrow(df)) {
@@ -158,56 +230,10 @@ for (i in 1:nrow(df)) {
 # limpando dados eliminando linhas sem informação
 
 
-df_filter <- df %>%
-  filter_at(1,all_vars(.!=""))%>%
-  filter_at(8,all_vars(.!=""))
+df_vtn_aptidao_filter <- df %>%
+  filter_at(1,all_vars(.!=""))
+  #filter_at(8,all_vars(.!=""))
 
-# algumas linhas com a info. de sem informação ficam deslocadas. 
-
-# o problema eh identificavel sempre que a coluna fonte != 1,2
-
-#filtrando linhas deslocadas
-
-# dataframe com linhas deslocadas
-df_filter_desl <- df_filter %>%
-  filter_at(8,all_vars(!.%in% c(1,2)))
-# dataframe sem as linhas deslocadas
-df_filter_s_desl <- df_filter %>%
-  filter_at(8,all_vars(.%in% c(1,2)))
-
-
-# Defina a quantidade de deslocamento
-
-deslocamento_inicio <- 3
-deslocamento_final <- 8
-
-# Inicialize um data frame vazio
-
-df_resultado <- list()
-
-# Loop sobre as linhas do data frame para deslocar as colunas erradas!
-
-for(linha in 1:nrow(df_filter_desl)){
-  
-  s <- df_filter_desl[linha,]
-  if(s[,2]==""){
-    s[,2:7] <- s[,3:8]
-    s[,8] <- NA
-    df_resultado[[linha]] <- s
-  }
-  if(s[,7]==""){
-    s[,7] <- s[,8]
-    s[,8] <- NA
-    df_resultado[[linha]] <- s
-    
-  }else{next}
-  
-} 
-df_resultado <- do.call(rbind,df_resultado)
- 
-# juntando no dataframe original
-
-df_corrigido <- rbind(df_resultado,df_filter_s_desl)
 
 # combinando os 2 dfs
 
@@ -216,20 +242,24 @@ df_corrigido <- rbind(df_resultado,df_filter_s_desl)
 df_nulo <- matrix(nrow = nrow(df_vtn_unico),ncol = 5)
 
 # criando outro df pra evitar numero grande de linhas ao rodar de novo
+
 df_vtn_unico_2 <- cbind(df_vtn_unico,df_nulo)
 
+# padronizando nome das colunas pra juntar num df unico
 names(df_vtn_unico_2)[3] <- "VTN_unico"
-names(df_vtn_unico_2)[c(5:9)] <-names(df_corrigido)[c(2:6)] 
+names(df_vtn_unico_2)[c(6:10)] <-names(df_vtn_aptidao_filter)[c(2:6)] 
 
-df_corrigido$VTN_unico <- NA
+df_vtn_aptidao_filter$VTN_unico <- NA
 
-names(df_corrigido)[9] <- "UF"
+names(df_vtn_aptidao_filter)[9] <- "UF"
 
 df_vtn_unico_2$Preservação <- NA
+# eliminando coluna com obs
+df_vtn_unico_2 <-df_vtn_unico_2 [,-2]
 
-names(df_vtn_unico_2)[1]= names(df_corrigido)[1]
+#names(df_vtn_unico_2)[1]= names(df_vtn_aptidao_filter)[1]
 
-df_unificado <- rbind(df_vtn_unico_2[,-2],df_corrigido[,-8])
+df_unificado <- rbind(df_vtn_unico_2,df_vtn_aptidao_filter)
 
 # tem q converter pra valor
 
@@ -241,7 +271,7 @@ df_unificado2 <- df_unificado %>% mutate_at(c(2,4:9), f)
 
 # salvando
 # trocar nome q eh salvo, pra nao sobrescrever
-write.csv(df_unificado2,"data/VTN_RF_2022.csv",row.names = F)
+write.csv(df_unificado2,paste0("data/VTN_RF_",ano,".csv"),row.names = F)
 
 }
 #SAO PAULO - SP_BADY BASSITT
