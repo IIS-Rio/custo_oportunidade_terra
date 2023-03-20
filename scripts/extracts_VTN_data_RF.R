@@ -164,114 +164,114 @@ get_table2 <- function(raw) {
   data.table
 }
 
-
-
 anos <- c(2019,2021,2022)
 
 UFs_valor_unico <- c("CEARA - CE","AMAZONAS - AM","AMAZONAS - AM") 
 
 contador <- 1
 
-for(ano in anos){
-
-# por enquanto essa parte aqui funciona com 2022, nao sei se funcionaria com os outros. 
-#txt <- pdf_text(pdf ="data/VTN_2022.pdf")
-
-txt <- pdf_text(pdf =paste0("data/VTN_",ano,".pdf"))
-
-#raw_text <- map("data/VTN_2022.pdf", txt)
-
-df_vtn_unico <- get_table(raw = txt,ano = ano)
-
-#names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
-
-df_vtn_unico$UF <- UFs_valor_unico[contador]
-
-df_vtn_aptidao <- get_table2(raw = txt)
-
-# adicionar uf
-
-ufs <- df_vtn_aptidao %>%
-  # coluna 3 sempre vazia qndo a 1 = UF
-  filter_at(c(1,3),all_vars(.==""))%>%
-  #selecionar apenas coluna com UF
-  select_at(2)%>%
-  rename_with(.cols = 1, ~"uf")
-
-ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
-  
-# loop enquanto uf == uf, name it, when it changes, go to next one
-
-j <- 1 # initialize a counter for the vector
-
-df <- df_vtn_aptidao
-
-uf <- ufs$uf
-uf2 <- uf[2:18]# sem bahia
-# repete tocantins
-uf2[18] <- uf2[17]
-
-# ficou faltando soh tocantis! teria q dar um jeito de encaixar! colocar um tocantins repetido
-
-for (i in 1:nrow(df)) {
-  if (df[i, 2] !=uf2[j]) {
-    df[i, "uf"] <- uf[j]
-    #j <- j + 1
-    # if (j > length(ufs$uf)) {
-    #   j <- 1
-    # }
-  } else {
-    j <- j + 1
-    df[i, "uf"] <- uf[j]
-    
-  }
-}
-
-# limpando dados eliminando linhas sem informação
-
-
-df_vtn_aptidao_filter <- df %>%
-  filter_at(1,all_vars(.!=""))
-  #filter_at(8,all_vars(.!=""))
-
-
-# combinando os 2 dfs
-
-# padronizando numero de colunas
-
-df_nulo <- matrix(nrow = nrow(df_vtn_unico),ncol = 5)
-
-# criando outro df pra evitar numero grande de linhas ao rodar de novo
-
-df_vtn_unico_2 <- cbind(df_vtn_unico,df_nulo)
-
-# padronizando nome das colunas pra juntar num df unico
-names(df_vtn_unico_2)[3] <- "VTN_unico"
-names(df_vtn_unico_2)[c(6:10)] <-names(df_vtn_aptidao_filter)[c(2:6)] 
-
-df_vtn_aptidao_filter$VTN_unico <- NA
-
-names(df_vtn_aptidao_filter)[9] <- "UF"
-
-df_vtn_unico_2$Preservação <- NA
-# eliminando coluna com obs
-df_vtn_unico_2 <-df_vtn_unico_2 [,-2]
-
-#names(df_vtn_unico_2)[1]= names(df_vtn_aptidao_filter)[1]
-
-df_unificado <- rbind(df_vtn_unico_2,df_vtn_aptidao_filter)
-
-# tem q converter pra valor
-
 # funcao converte caracteres em pt pra formato ingles
 
 f <- function(x)parse_number(x,locale = locale(decimal_mark = ",", grouping_mark = "."))
 
-df_unificado2 <- df_unificado %>% mutate_at(c(2,4:9), f)
+for(ano in anos){
 
-# salvando
-# trocar nome q eh salvo, pra nao sobrescrever
-write.csv(df_unificado2,paste0("data/VTN_RF_",ano,".csv"),row.names = F)
-
+  # por enquanto essa parte aqui funciona com 2022, nao sei se funcionaria com os outros. 
+  #txt <- pdf_text(pdf ="data/VTN_2022.pdf")
+  
+  txt <- pdf_text(pdf =paste0("data/VTN_",ano,".pdf"))
+  
+  #raw_text <- map("data/VTN_2022.pdf", txt)
+  
+  df_vtn_unico <- get_table(raw = txt,ano = ano)
+  
+  #names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
+  
+  df_vtn_unico$UF <- UFs_valor_unico[contador]
+  
+  df_vtn_aptidao <- get_table2(raw = txt)
+  
+  # adicionar uf - 2019 nao tem Amazonas - checar se 2020 tem!!
+  
+  ufs <- df_vtn_aptidao %>%
+    # coluna 3 sempre vazia qndo a 1 = UF
+    filter_at(c(1,3),all_vars(.==""))%>%
+    #selecionar apenas coluna com UF
+    select_at(2)%>%
+    rename_with(.cols = 1, ~"uf")
+  
+  ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
+    
+  # loop enquanto uf == uf, name it, when it changes, go to next one
+  
+  j <- 1 # initialize a counter for the vector
+  
+  df <- df_vtn_aptidao
+  
+  # testando adicionar um outro if aqui, pra 2021,22 x 2019
+  if(ano==2021|ano==2022){
+    uf <- ufs$uf
+    uf2 <- uf[2:18]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!se usar um na exclude da certo
+    # repete tocantins
+    uf2[18] <- uf2[17]
+  }else{
+    uf <- ufs$uf
+    uf2 <- uf[2:17]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!se usar um na exclude da certo
+    # repete tocantins
+    uf2[17] <- uf2[16]
+  }
+  # ficou faltando soh tocantis! teria q dar um jeito de encaixar! colocar um tocantins repetido
+  
+  for (i in 1:nrow(df)) {
+    if (df[i, 2] !=uf2[j]) {
+      df[i, "uf"] <- uf[j]
+      
+    } else {
+      j <- j + 1
+      df[i, "uf"] <- uf[j]
+      
+    }
+  }
+  
+  # limpando dados eliminando linhas sem informação
+  
+  
+  df_vtn_aptidao_filter <- df %>%
+    filter_at(1,all_vars(.!=""))
+    
+  # combinando os 2 dfs
+  
+  # padronizando numero de colunas
+  
+  df_nulo <- matrix(nrow = nrow(df_vtn_unico),ncol = 5)
+  
+  # criando outro df pra evitar numero grande de linhas ao rodar de novo
+  
+  df_vtn_unico_2 <- cbind(df_vtn_unico,df_nulo)
+  
+  # padronizando nome das colunas pra juntar num df unico
+  names(df_vtn_unico_2)[3] <- "VTN_unico"
+  names(df_vtn_unico_2)[c(6:10)] <-names(df_vtn_aptidao_filter)[c(2:6)] 
+  
+  df_vtn_aptidao_filter$VTN_unico <- NA
+  
+  names(df_vtn_aptidao_filter)[9] <- "UF"
+  
+  df_vtn_unico_2$Preservação <- NA
+  # eliminando coluna com obs
+  df_vtn_unico_2 <-df_vtn_unico_2 [,-2]
+  
+  df_unificado <- rbind(df_vtn_unico_2,df_vtn_aptidao_filter)
+  
+  # tem q converter pra valor
+  
+  df_unificado2 <- df_unificado %>% mutate_at(c(2,5:10), f)
+  
+  # salvando
+  
+  write.csv(df_unificado2,paste0("data/VTN_RF_",ano,".csv"),row.names = F)
+  contador <- contador+1
 }
 #SAO PAULO - SP_BADY BASSITT
+
+# checar se deu certo, mas acho que sim!
