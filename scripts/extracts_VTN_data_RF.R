@@ -9,6 +9,7 @@ library(stringr)
 # library(tabulizer)
 library(tidyverse)
 library(readr)
+library(stringi)
 #-------------------------------------------------------------------------------
 
 
@@ -19,7 +20,7 @@ library(readr)
 
 # anos com dados disponiceis
 
-anos <- c(2019:2021)
+anos <- c(2019:2022)
 
 # 2022 o padrao da url eh diferente
 
@@ -41,6 +42,11 @@ download.file(url = url,destfile = file.path(dest,"VTN_",anos,".pdf"),mode = "wb
 
 download.file(url = url19_21,destfile = paste0(dest,"/VTN_",anos,".pdf")
                                                ,mode = "wb")
+
+# OBS:
+
+# o pdf de 2020 tem q ser convertido no I love pdf pra um arquivo selecionavel!
+
 
 ################################################################################
 #lendo pdf e transformando em data frame
@@ -65,16 +71,16 @@ get_table <- function(raw,ano) {
       f = "viçosa do ceará"
       table_start <- stringr::str_which(tolower(raw),i)
       table_end <- stringr::str_which(tolower(raw),f)
-    }else{
-      
-      next
-      # essa funcao nao esta funcionando pq o pdf_text nao funciona com esse de 2020 - rever 
-      # Define as páginas onde a tabela começa e termina
-      # table_start <- stringr::str_which(tolower(raw), "uf\nac")
-      # table_end <- stringr::str_which(tolower(raw), "uniao do norte")
-      
-      }
     }
+  else{
+    # pdf 2020 nao reconhece caracteres especiasi, tem q tirar
+    i="abaiara"
+    f = "vicosa do ceara"
+    remove_latin <- function(x)stri_trans_general(str = x,id = "Latin-ASCII")
+    table_start <- stringr::str_which(tolower(raw),i)
+    table_end <- stringr::str_which(tolower(remove_latin(raw)),f)
+    }
+   }
   
   table_end <- table_end[min(which(table_end>table_start))]
   # build the table and remove special characters
@@ -133,6 +139,35 @@ get_table2 <- function(raw) {
     colnames(data.table) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
     data.table
   }
+  if (ano == 2020){
+    table_start <- stringr::str_which(tolower(raw),"alcobaca")
+    table_end <- stringr::str_which(tolower(raw),"tupiratins")
+    table_end <- table_end[min(which(table_end>table_start))]
+    # build the table and remove special characters
+    table <- raw[(table_start): (table_end)]
+    ## simbolo "\\s = any white spates
+    # substitui 2 espacos por |
+    table <- str_replace_all(table,"\\s{2,}","|")
+    # separad oq falta, s/informacao por | tb
+    table <- str_replace_all(table," s","|")
+    # concerta qndo so tem um espaco entre penultima coluna e o valor da coluna fonte
+    table <- str_replace_all(table," 1","|")
+    text_con <- textConnection(table)
+    data.table <- read.csv(text_con,sep="|",header = F)
+    # excluir dados do CE
+    i <- which(data.table$V2=="CEARA - CE") 
+    f <- which(data.table$V1=="VICOSA DO CEARA")
+    #data.table <- data.table %>%
+    exclude <- data.table%>% slice(i:f)
+    exclude$ID <- paste0(exclude$V1,exclude$V2)
+    data.table2 <- data.table%>%
+      mutate(ID=paste0(V1,V2)) %>%
+      filter(!ID %in% exclude$ID)%>%
+      select(-ID)
+    colnames(data.table2) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+    data.table <- data.table2
+    }
+    
   if (ano == 2019){
     table_start <- stringr::str_which(tolower(raw),"baianópolis")
     table_end <- stringr::str_which(tolower(raw),"tupirama")
@@ -164,9 +199,9 @@ get_table2 <- function(raw) {
   data.table
 }
 
-anos <- c(2019,2021,2022)
+anos <- c(2019,2020,2021,2022)
 
-UFs_valor_unico <- c("CEARA - CE","AMAZONAS - AM","AMAZONAS - AM") 
+UFs_valor_unico <- c("CEARA - CE","CEARA - CE","AMAZONAS - AM","AMAZONAS - AM") 
 
 contador <- 1
 
@@ -176,11 +211,11 @@ f <- function(x)parse_number(x,locale = locale(decimal_mark = ",", grouping_mark
 
 for(ano in anos){
 
-  # por enquanto essa parte aqui funciona com 2022, nao sei se funcionaria com os outros. 
-  #txt <- pdf_text(pdf ="data/VTN_2022.pdf")
+  if (ano==2020){
   
-  txt <- pdf_text(pdf =paste0("data/VTN_",ano,".pdf"))
+  txt <- pdf_text(pdf =paste0("data/VTN_",ano,"_converted.pdf"))
   
+  }else{txt <- pdf_text(pdf =paste0("data/VTN_",ano,".pdf"))}
   #raw_text <- map("data/VTN_2022.pdf", txt)
   
   df_vtn_unico <- get_table(raw = txt,ano = ano)
@@ -272,6 +307,8 @@ for(ano in anos){
   write.csv(df_unificado2,paste0("data/VTN_RF_",ano,".csv"),row.names = F)
   contador <- contador+1
 }
+
+
 #SAO PAULO - SP_BADY BASSITT
 
 # checar se deu certo, mas acho que sim!
