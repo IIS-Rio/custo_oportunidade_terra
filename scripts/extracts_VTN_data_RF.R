@@ -199,7 +199,8 @@ get_table2 <- function(raw) {
   data.table
 }
 
-anos <- c(2019,2020,2021,2022)
+
+#anos <- c(2019,2020,2021,2022)
 
 UFs_valor_unico <- c("CEARA - CE","CEARA - CE","AMAZONAS - AM","AMAZONAS - AM") 
 
@@ -244,19 +245,30 @@ for(ano in anos){
   df <- df_vtn_aptidao
   
   # testando adicionar um outro if aqui, pra 2021,22 x 2019
-  if(ano==2021|ano==2022){
+  if(ano==2021){
     uf <- ufs$uf
-    uf2 <- uf[2:18]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!se usar um na exclude da certo
+    uf2 <- uf[2:19]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!
+    # repete tocantins
+    uf2[19] <- uf2[18]
+  }
+  if(ano==2022){
+    uf <- ufs$uf
+    uf2 <- uf[2:18]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!
     # repete tocantins
     uf2[18] <- uf2[17]
-  }else{
+  }
+  if(ano==2020){
     uf <- ufs$uf
-    uf2 <- uf[2:17]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!se usar um na exclude da certo
+    uf2 <- uf[2:18]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!
+    # repete tocantins
+    uf2[18] <- uf2[17]
+  }
+  if (ano==2019){
+    uf <- ufs$uf
+    uf2 <- uf[2:17]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!
     # repete tocantins
     uf2[17] <- uf2[16]
   }
-  # ficou faltando soh tocantis! teria q dar um jeito de encaixar! colocar um tocantins repetido
-  
   for (i in 1:nrow(df)) {
     if (df[i, 2] !=uf2[j]) {
       df[i, "uf"] <- uf[j]
@@ -308,7 +320,5 @@ for(ano in anos){
   contador <- contador+1
 }
 
+# nao ta rolando pra 2022 agora, parece q 2022 tem 1 estado a menos q 2021.  corrigir isso separando a parte q agrega uf!
 
-#SAO PAULO - SP_BADY BASSITT
-
-# checar se deu certo, mas acho que sim!
