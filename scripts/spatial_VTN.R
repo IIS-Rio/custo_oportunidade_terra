@@ -1,3 +1,6 @@
+# transformar os dados de VTN em rasters com a mesma resolucao espacial dos land-uses
+
+
 #-------------------------------------------------------------------------------
 
 # pacotes
@@ -9,6 +12,7 @@ library(sf)
 #-------------------------------------------------------------------------------
 
 # testando com 2022, depois fazer com os outros
+
 anos <- 2019:2022
 
 # nomes corretos pra conseguir fazer um join entre municipios ibge e dados VTN
@@ -146,65 +150,19 @@ for (ano in anos){
 
 
 
-VTN_2022 <- read.csv("mun_VTN/mun_VTN_2022.csv")
+
+# shape com mun ano 2020 (mais recente), do pacote geobr
+
+mun <- read_municipality(year="2020")
 
 
-# pastagem
-
-cod <- 5203500
-
-# selecionando municipio
-
-VTN_2022sub <- filter(VTN_2022,code_muni==cod)
-
-# valor VTN pastagem plantada /ha
-vtn_pastagem <-VTN_2022sub$Pastagem.Plantada
-areaPixel <- 980 *1220/10^4
-
-valor_pixel_mun <- vtn_pastagem*areaPixel
-
-# subset com o municipio de interesse
-
-rsub <- r==cod
-
-
-# fracao de pastagem do municipio
-
-pasture_mun <- pasture * rsub
-
-# isso multiplica o valor de pastagem pela fracao do pixel coberto por pastagem
-
-VTN_fracao_pastagem <- pasture_mun*valor_pixel_mun
-
-# guardar isso numa lista...
-# qndo terminar , juntar num vtn pastagem. pro ano em questao.
-
-
-
-
-# abrindo por ano
-
-# rasterizar codigos municipios
-
-mun$ID_pixel <- 1:5570
-
+# transformar municipios em raster 1km com codigo mun como valor pixel
 
 # raster base com resol certa
 
 rb <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020/cropland_1km.tif")
 
-rb_grid <- as(rb, "sf")
-
-
-lista_r <- list.files("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020",full.names = T)[-c(9,7)]
-
-rasters <- lapply(lista_r,raster)
-
-soma <- Reduce(f = "+",rasters)
-
 library(fasterize)
-
-# checar funcao fasterize
 
 crs <- crs(rb)
 
@@ -212,14 +170,88 @@ mun_pj <- st_transform(x = mun,crs = crs)
 
 r <- fasterize(sf = mun_pj,raster = rb,field = "code_muni")
 
-pasture <- rasters[[6]]
+# abrindo csv com dados de VTN por municipio
+
+VTN_2022 <- read.csv("mun_VTN/mun_VTN_2022.csv")
+
+# tem alguns municios repetidos
+
+repet <- VTN_2022[duplicated(VTN_2022$code_muni),]
+
+# excluir do df oq ta repedito!
+
+VTN_2022_filt <- VTN_2022[!row.names(VTN_2022) %in% row.names(repet),]
+
+# abrindo rasters de land use
+
+lista_r <- list.files("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020",full.names = T)[-c(9,7)]
+
+rasters <- lapply(lista_r,raster)
+
+pasture <- rasters[[6]] # isso aqui tem que incluir num loop tb
 
 
+# listas pra guardar resultados e integrar depois
+
+lista_pastagem <- list()
+
+contador <- 1
+
+# loop por municipio pra espacialiar
+
+# pastagem
+
+# esse codigo gera um raster pesadissimo. tem q ver pq e otimizar!talvez seja pq ele ta considerando em cada rodada o brasil todo, precisaria recortar pra ser so a parte q interessa mesmo.
+
+for (cod in VTN_2022_filt$code_muni){
+    
+  #cod <- 5203500
+  
+  # selecionando municipio
+  
+  VTN_2022sub <- filter(VTN_2022_filt,code_muni==cod)
+  
+  # diferenciar se tem usos discriminados ou nao
+  
+  # loop de land- use (tem q adicionar Aptidao ainda)
+  
+  #---- pastagem ---------------------------------
+  if (is.na(VTN_2022sub$VTN_unico)){
+  # valor VTN pastagem plantada /ha
+  vtn_pastagem <-VTN_2022sub$Pastagem.Plantada
+  
+  }else{vtn_pastagem <-VTN_2022sub$VTN_unico}
+  
+  areaPixel <- 980 *1220/10^4
+  
+  valor_pixel_mun <- vtn_pastagem*areaPixel
+  
+  # subset com o municipio de interesse
+  
+  rsub <- r==cod
+  
+  # fracao de pastagem do municipio
+  
+  pasture_mun <- pasture * rsub
+  
+  # isso multiplica o valor de pastagem pela fracao do pixel coberto por pastagem
+  
+  VTN_fracao_pastagem <- pasture_mun*valor_pixel_mun
+  
+  
+  lista_pastagem[[contador]] <- VTN_fracao_pastagem
+  contador <- contador + 1
+  
+  }
+
+# resultado nao vai cobrir o brasil todo, apenas os os 2000 e tantos municipios que tem dados.
 
 
+# re_integrando dados
 
+# oc_pastagem <- do.call(sum,lista_pastagem)
 
-
+oc_pastagem <- Reduce("+",lista_pastagem)
 
 
 
