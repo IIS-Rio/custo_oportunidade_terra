@@ -1,5 +1,6 @@
 # transformar os dados de VTN em rasters com a mesma resolucao espacial dos land-uses
 
+# por enquanto, eu testei com land-use mapbiomas de 2022. isso pode ser ajustado, talvez seja melhor usar land-use do mesmo ano do dado.
 
 #-------------------------------------------------------------------------------
 
@@ -7,6 +8,7 @@
 
 library(geobr)
 library(sf)
+library(dplyr)
 #library(RColorBrewer)
 
 #-------------------------------------------------------------------------------
@@ -25,6 +27,7 @@ nomes_corretos_2022 <- c("Bom Jesus De Goiás","Brazópolis","São Tomé Das Let
 
 # 2020 tb ta com erro, nao ta separando bem os dados
 
+#/dados/libraryR/4.0
 
 # 2019 ok
 nomes_corretos_2019 <- c("Barão De Monte Alto","Brazópolis","Poxoréu","Sant'ana Do Livramento","Balneário Piçarras","Grão-Pará","	
@@ -33,8 +36,6 @@ Biritiba Mirim","São Valério")
 # shape com mun ano 2020 (mais recente), do pacote geobr
 
 mun <- read_municipality(year="2020")
-
-plot(st_geometry(mun))
 
 #eliminar acentuacao 
 
@@ -238,26 +239,48 @@ for (cod in VTN_2022_filt$code_muni){
   
   VTN_fracao_pastagem <- pasture_mun*valor_pixel_mun
   
+  # cortar o raster pro limite do municio, pra ficar mais leve
   
-  lista_pastagem[[contador]] <- VTN_fracao_pastagem
+  mun_pj_sub <- filter(mun_pj,code_muni==cod)
+  VTN_fracao_pastagem_m <- mask(VTN_fracao_pastagem,mun_pj_sub)
+  VTN_fracao_pastagem_c <- crop(VTN_fracao_pastagem_m,mun_pj_sub)
+  
+  
+  lista_pastagem[[contador]] <- VTN_fracao_pastagem_c
   contador <- contador + 1
   
   }
 
-# resultado nao vai cobrir o brasil todo, apenas os os 2000 e tantos municipios que tem dados.
+
+# funcao pra mosaicar de volta em um raster so!
+
+mosaic_f <- function(list_solutions,x,y){
+  
+  solutions_raster <- list() 
+  c = 1
+  for (i in seq(x,y,1)) {
+    
+    solutions_raster[[c]] <- list_solutions[[i]][[1]]
+    c = c + 1
+  }
+  
+  solutions_raster$fun <- mean
+  solutions_raster$na.rm <- TRUE
+  mosaic_scen <- do.call(mosaic,solutions_raster)
+  return(mosaic_scen)
+}
 
 
-# re_integrando dados
-
-# oc_pastagem <- do.call(sum,lista_pastagem)
-
-oc_pastagem <- Reduce("+",lista_pastagem)
+pastagem_mos <- mosaic_f(list_solutions = lista_pastagem,x = 1,y = length(lista_pastagem))
 
 
+plot(pastagem_mos)
 
+# cheanco se sobrepos correatamentente!
 
+plot(st_geometry(mun_pj))
 
+# Overlay the raster on top of the plot
+plot(pastagem_mos, add = TRUE)
 
-
-
-
+writeRaster(pastagem_mos,"rasters_VTN/2022/VTN_pastureland_2022.tif")
