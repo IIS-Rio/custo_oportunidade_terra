@@ -12,6 +12,10 @@ library(dplyr)
 # organizar esse scritp, mantendo versao 3 e 4! depois adicionar funcao de 
 # mosaicar -- precisa testar com a parelilzacao
 
+# preencher tabela de VTN onde tem NA antes de rodar o for, pra evitar subestimar valor do municipio na hora de somar os vtns dos diferentes lu!
+
+
+
 ################################################################################
 # transformar municipios em raster 1km com codigo mun como valor pixel
 ################################################################################

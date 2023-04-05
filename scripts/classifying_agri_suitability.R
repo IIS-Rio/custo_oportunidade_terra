@@ -29,6 +29,9 @@ plot(r_relevo)
 
 avg_apti <- mean(r_solo,r_clima,r_relevo)
 
+plot(avg_apti)
+
+
 # resample to match projection INPE
 
 # raster base com resol certa
@@ -40,6 +43,8 @@ rb <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baselin
 
 avg_apti_res <- projectRaster(from = avg_apti, to = rb,method = "bilinear")
 
+
+
 # clipar pra tirar os zeros de fora do pais
 
 br <- read_country()
@@ -49,9 +54,13 @@ br_pj <- st_transform(x = br,crs = crs(avg_apti_res))
 avg_apti_res_c <- crop(avg_apti_res,br_pj)
 avg_apti_res_m <- mask(avg_apti_res_c,br_pj)
 
+plot(avg_apti_res_m)
+
+hist(avg_apti_res_m[])
 
 # Calculate quantiles to get breakpoints
 # primeira forma de fazer
+
 breaks <- quantile(values(avg_apti_res_m), probs = seq(0, 1, length.out = 4),na.rm=T)
 
 # segunda forma de fazer
@@ -74,6 +83,14 @@ avg_apti_res_class <- cut(avg_apti_res_m, breaks = breaks)
 
 # Classify the raster into three classes using the breaks
 rc <- cut(avg_apti_res_m, breaks=brks)
+
+rc2 <- cut(avg_apti_res_m, breaks=breaks)
+
+plot(rc)
+
+plot(rc2)
+
+
 # resolvi pela segunda forma
 writeRaster(rc,"/dados/projetos_andamento/custo_oportunidade/aptidao_agricola/aptidao_media_3_classes.tif",overwrite=T)
 
