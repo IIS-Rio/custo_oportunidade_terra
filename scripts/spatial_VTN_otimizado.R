@@ -9,15 +9,19 @@ library(dplyr)
 
 #-------------------------------------------------------------------------------
 
+# organizar esse scritp, mantendo versao 3 e 4! depois adicionar funcao de 
+# mosaicar -- precisa testar com a parelilzacao
+
+################################################################################
+# transformar municipios em raster 1km com codigo mun como valor pixel
+################################################################################
+
 # criando um raster com codigos dos municipios (isso)
 
 # shape com mun ano 2020 (mais recente), do pacote geobr
 
 mun <- read_municipality(year="2020")
 
-################################################################################
-# transformar municipios em raster 1km com codigo mun como valor pixel
-################################################################################
 # raster base com resol certa
 
 rb <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020/cropland_1km.tif")
@@ -27,6 +31,8 @@ crs <- crs(rb)
 # corrigindo projecao shape dos mun pra mesma dos land-uses
 
 mun_pj <- st_transform(x = mun,crs = crs)
+
+write_sf(mun_pj,"/dados/pessoal/francisco/custo_oportunidade_terra/mun_data/Brazil_municipalities_2020_mollenweide.shp")
 
 # rasterizando com cod dos municipios
 
@@ -38,6 +44,11 @@ writeRaster(r,"/dados/pessoal/francisco/custo_oportunidade_terra/mun_data/Brazil
 
 
 # os seguintes objetos precisam estar no environment
+
+# raster dos municipios
+
+r <- raster("/dados/pessoal/francisco/custo_oportunidade_terra/mun_data/Brazil_geocode_municipalities_2020.tif")
+
 
 
 # abrindo csv com dados de VTN por municipio
@@ -188,18 +199,15 @@ teste_cod_chatgpt <- spatial_VTN2(lu = "lavoura",lista_cod_IBGE = 5203500)
 toc()
 
 tic("sleeping")
-teste_cod_chatgpt2 <- spatial_VTN3(lu = "lavoura",lista_cod_IBGE = 5203500)
+teste_cod_chatgpt2 <- spatial_VTN3(lu = "lavoura",lista_cod_IBGE = lista_teste)
 #print("falling asleep...")
 #sleep_for_a_minute()
 #print("...waking up")
 toc()
 
-tic("sleeping")
-teste_cod_chatgpt3 <- spatial_VTN4(lu = "lavoura",lista_cod_IBGE = 5203500)
-#print("falling asleep...")
-#sleep_for_a_minute()
-#print("...waking up")
-toc()
+# paralelizando demorou 23 segundos pra rodar 3. sem paralelizar demora...47! 
+# vale a pena paralelizar!
+
 
 # sleeping: 13.388 sec elapsed
 
@@ -214,29 +222,31 @@ toc()
 
 # paralelizando o loop:
 
-library(foreach)
-library(doParallel)
-
-# Set number of cores to use
-n_cores <- 4
-registerDoParallel(makeCluster(n_cores))
 
 # paralelizar tem potencial, mas ele nao reconhece objetos abertos fora do loop, entao tem q adicionar ali dentro da funcao pra continuar. CONTINUAR!
  
+
+# continua dando um erro de not a valid cluster
+
 spatial_VTN4 <- function(lu, lista_cod_IBGE) {
   
-  # add necessary packages
+  # Set number of cores to use
+  n_cores <- 4
   
+  #registerDoParallel(makeCluster(n_cores))
   
-  # to complete (...)
+  cl <- makeCluster(n_cores)
+  Sys.sleep(1)
+  registerDoParallel(cl)
+  
   
   # Compute area of pixel
   areaPixel <- 980 * 1220 / 10^4
   
   # Iterate over each municipality code in parallel using foreach
-  results <- foreach(i = seq_along(lista_cod_IBGE), .combine = "list") %dopar% {
-    library(dplyr)
-    
+  # adicionei argumentos pra que os nucleos reconhecam objetos e pacotes
+  
+  results <- foreach(i = seq_along(lista_cod_IBGE), .combine = "list",.packages = c("dplyr","raster","sf","foreach","doParallel"),.export = c("VTN_2022_filt","lavouras_stack","pasture","lavoura","mun_pj","r","areaPixel")) %dopar% {
     
     cod <- lista_cod_IBGE[i]
     
@@ -292,8 +302,9 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE) {
                      fractions[[3]] *  vtn[3])
     }
     
-    # subset do raster de mun com o mun focal
+    # crop do raster de mun com o mun focal
     mun_pj_sub <- filter(mun_pj,code_muni==cod)
+    #sp_mun_pj_sub <- as(st_as_sfc(mun_pj_sub), "SpatialPolygons")# adicionei essa linha, se nao der certo, apagar
     vtn_m <- mask(VTN_mun,mun_pj_sub)
     vtn_c <- crop(vtn_m,mun_pj_sub)
     
@@ -302,7 +313,7 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE) {
   }
   
   # Stop the parallel processing
-  stopCluster(getDoParWorkers())
+  stopCluster(cl)
   
   
   # Print the results list
@@ -311,6 +322,27 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE) {
   # results
 }
 
+
+# pacotes pra paralelizar, dentro da fucao
+library(foreach)
+library(doParallel)
+
+# ok agora funciona, talvez valha pra qndo eh bem grande
+
+lista_teste <- lista_cod_IBGE[1:3]
+
+tic("sleeping")
+teste_cod_chatgpt3 <- spatial_VTN4(lu = "lavoura",lista_cod_IBGE = lista_teste)
+#print("falling asleep...")
+#sleep_for_a_minute()
+#print("...waking up")
+toc()
+# Stop the parallel processing
+#stopCluster(getDoParWorkers())
+
+plot(teste_cod_chatgpt3[[1]][[1]])
+plot(teste_cod_chatgpt3[[1]][[2]])
+plot(teste_cod_chatgpt3[[2]])
 
 
 
@@ -394,7 +426,4 @@ spatial_VTN3 <- function(lu, lista_cod_IBGE) {
   # # Return the list of results
   # results
 }
-
-
-
 
