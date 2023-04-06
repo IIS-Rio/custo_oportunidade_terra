@@ -136,4 +136,4 @@ df_preservacao <- do.call(rbind,preservacao_lista)
 # salvando planilha atualizada e sem NAs!
 
 
-write.csv(df_preservacao,"/dados/pessoal/francisco/custo_oportunidade_terra/data/VTN_RF_2022_NA_filled.csv",row.names = F)
+write.csv(df_preservacao,"/dados/pessoal/francisco/custo_oportunidade_terra/mun_VTN/mun_VTN_2022_NA_filled.csv",row.names = F)
