@@ -176,6 +176,8 @@ mosaic_f <- function(list_solutions,x,y){
 
 spatial_lavoura <- spatial_VTN4(lu = "lavoura",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
 
+spatial_lavoura <- unlist(spatial_lavoura)
+
 lavoura_mos <- mosaic_f(list_solutions = spatial_lavoura,x = 1,y = length(spatial_lavoura))
 
-writeRaster(lavoura_mos,"rasters_VTN/2022/VTN_cropland_2022.tif")
+writeRaster(lavoura_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_cropland_2022.tif")
