@@ -6,18 +6,20 @@ library(dplyr)
 library(raster)
 library(fasterize)
 library(dplyr)
-
+# versao da funcao com paralelizacao
+# pacotes pra paralelizar, dentro da fucao
+library(foreach)
+library(doParallel)
 #-------------------------------------------------------------------------------
 
 # organizar esse scritp, mantendo versao 3 e 4! depois adicionar funcao de 
 # mosaicar -- precisa testar com a parelilzacao
 
-# preencher tabela de VTN onde tem NA antes de rodar o for, pra evitar subestimar valor do municipio na hora de somar os vtns dos diferentes lu!
-
-
+# por enquanto, a funcao so funciona pra lavoura e pastagem
 
 ################################################################################
 # transformar municipios em raster 1km com codigo mun como valor pixel
+# *** so precisa rodar a 1a vez ***
 ################################################################################
 
 # criando um raster com codigos dos municipios (isso)
@@ -47,25 +49,22 @@ writeRaster(r,"/dados/pessoal/francisco/custo_oportunidade_terra/mun_data/Brazil
 ################################################################################
 
 
-# os seguintes objetos precisam estar no environment
+# os seguintes objetos precisam estar no environment, pra depois serem inseridos na funcao foreach
 
 # raster dos municipios
 
 r <- raster("/dados/pessoal/francisco/custo_oportunidade_terra/mun_data/Brazil_geocode_municipalities_2020.tif")
 
+# shape dos municipios pra usar de mascara
+
+mun_pj <- st_read("mun_data/Brazil_municipalities_2020_mollenweide.shp")
 
 
 # abrindo csv com dados de VTN por municipio
 
-VTN_2022 <- read.csv("mun_VTN/mun_VTN_2022.csv")
+# usando planilha com NAs preenchidos
 
-# tem alguns municios repetidos
-
-repet <- VTN_2022[duplicated(VTN_2022$code_muni),]
-
-# excluir do df oq ta repedito!
-
-VTN_2022_filt <- VTN_2022[!row.names(VTN_2022) %in% row.names(repet),]
+VTN_2022 <- read.csv("mun_VTN/mun_VTN_2022_NA_filled.csv")
 
 # abrindo rasters de land use
 
@@ -78,6 +77,12 @@ pasture <- rasters[[6]]
 # esse raster eh usado qndo o valor eh unico
 
 lavoura <- rasters[[1]] 
+
+silviculture <- rasters[[7]] 
+
+# soma os raster de veg nativa!(forest, grassland,otn,wetland)
+
+nat_veg <- rasters[[2]] + rasters[[3]] + rasters[[5]]+rasters[[8]]
 
 # rasters de lavoura distinguindo por aptidao
 
@@ -92,150 +97,13 @@ lavoura_aptidao_restrita <- raster("/dados/projetos_andamento/custo_oportunidade
 
 lavouras_stack <- stack(lavoura_aptidao_boa,lavoura_aptidao_media,lavoura_aptidao_restrita)
 
-# por enquanto so funciona com lavoura e pastagem!
 
-spatial_VTN2 <- function(lu, lista_cod_IBGE) {
-  
-  # add necessary packages
-  
-  # to complete (...)
-  
-  # Compute area of pixel
-  areaPixel <- 980 * 1220 / 10^4
-  
-  
-  # Create a named list to hold the results
-  results <- vector(mode = "list", length = length(lista_cod_IBGE))
-  names(results) <- lista_cod_IBGE
-  
-  # Iterate over each municipality code
-  for (i in seq_along(lista_cod_IBGE)) {
-    cod <- lista_cod_IBGE[i]
-    
-    # Select municipality
-    VTN_2022sub <- VTN_2022_filt %>% filter(code_muni == cod)
-    
-    # Compute VTN values - corrigir a partir daqui!
-    if (is.na(VTN_2022sub$VTN_unico)) {
-      if (lu == "pastagem") {
-        # Pastagem
-        vtn <- VTN_2022sub$Pastagem.Plantada
-      } else {
-        # Lavoura
-        vtn <- c(VTN_2022sub$Lavoura.Aptidão.Boa,
-                 VTN_2022sub$Lavoura.Aptidão.Regular,
-                 VTN_2022sub$Lavoura.Aptidão.Restrita)
-        # adicionar aqui os if_elses da lavoura, substituindo valores faltantes
-        # Simplified if_else statements
-        if (is.na(vtn[1])) vtn[1] <- ifelse(is.na(vtn[2]), vtn[3], vtn[2])
-        if (is.na(vtn[2])) vtn[2] <- ifelse(is.na(vtn[1]), vtn[3], vtn[1])
-        if (is.na(vtn[3])) vtn[3] <- ifelse(is.na(vtn[1]), vtn[2], vtn[1])
-        
-      }
-      
-      #}
-    } else {
-      if (lu == "pastagem") {
-        # Pastagem
-        vtn <- VTN_2022sub$VTN_unico
-      } else {
-        # Lavoura 
-        vtn <- rep(VTN_2022sub$VTN_unico, 3)
-      }
-    }
-    
-    # Multiply VTN values by area of pixel
-    vtn <- vtn * areaPixel
-    
-    # Compute fractions of land use
-    if (lu == "pastagem") {
-      # Pastagem
-      fractions <- pasture * (r == cod)
-    } else {
-      # Lavoura
-      fractions <- lavouras_stack * (r == cod)
-    }
-    
-    # Multiply fractions by VTN values and sum across all land use classes
-    if (lu == "pastagem") {
-      # Pastagem
-      VTN_mun <- sum(fractions * vtn)
-    } else {
-      # Lavoura
-      VTN_mun <- sum(fractions[[1]] * vtn[1],
-                     fractions[[2]] *  vtn[2],
-                     fractions[[3]] *  vtn[3])
-    }
-    
-    # subset do raster de mun com o mun focal
-    mun_pj_sub <- filter(mun_pj,code_muni==cod)
-    vtn_m <- mask(VTN_mun,mun_pj_sub)
-    vtn_c <- crop(vtn_m,mun_pj_sub)
-    # Store the result in the list
-    results[[i]] <- vtn_c
-  }
-  
-  # Return the list of results
-  results
-}
+# o argumento lu deve ser preenchido com "pastagem" ou "lavoura"
 
-
-
-
-teste_cod_chatgpt <- spatial_VTN2(lu = "lavoura",lista_cod_IBGE = 5203500)
-teste_cod_meu <- spatial_VTN(lu = "lavoura",lista_cod_IBGE = 5203500)
-
-
-plot(teste_cod_chatgpt[[1]])
-plot(teste_cod_meu[[1]])
-# OK!
-summary(teste_cod_chatgpt[[1]]-teste_cod_meu[[1]][])
-
-
-# teste de tempo
-
-library(tictoc)
-tic("sleeping")
-teste_cod_chatgpt <- spatial_VTN2(lu = "lavoura",lista_cod_IBGE = 5203500)
-#print("falling asleep...")
-#sleep_for_a_minute()
-#print("...waking up")
-toc()
-
-tic("sleeping")
-teste_cod_chatgpt2 <- spatial_VTN3(lu = "lavoura",lista_cod_IBGE = lista_teste)
-#print("falling asleep...")
-#sleep_for_a_minute()
-#print("...waking up")
-toc()
-
-# paralelizando demorou 23 segundos pra rodar 3. sem paralelizar demora...47! 
-# vale a pena paralelizar!
-
-
-# sleeping: 13.388 sec elapsed
-
-tic("sleeping")
-teste_cod_meu <- spatial_VTN2(lu = "lavoura",lista_cod_IBGE = 5203500)
-#print("falling asleep...")
-#sleep_for_a_minute()
-#print("...waking up")
-toc()
-
-# sleeping: 13.547 sec elapsed
-
-# paralelizando o loop:
-
-
-# paralelizar tem potencial, mas ele nao reconhece objetos abertos fora do loop, entao tem q adicionar ali dentro da funcao pra continuar. CONTINUAR!
- 
-
-# continua dando um erro de not a valid cluster
-
-spatial_VTN4 <- function(lu, lista_cod_IBGE) {
+# spatial_VTN4 <- function(lu, lista_cod_IBGE,n_cores) {
   
   # Set number of cores to use
-  n_cores <- 4
+  n_cores <- n_cores
   
   #registerDoParallel(makeCluster(n_cores))
   
@@ -250,12 +118,13 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE) {
   # Iterate over each municipality code in parallel using foreach
   # adicionei argumentos pra que os nucleos reconhecam objetos e pacotes
   
-  results <- foreach(i = seq_along(lista_cod_IBGE), .combine = "list",.packages = c("dplyr","raster","sf","foreach","doParallel"),.export = c("VTN_2022_filt","lavouras_stack","pasture","lavoura","mun_pj","r","areaPixel")) %dopar% {
+  results <- foreach(i = seq_along(lista_cod_IBGE), .combine = "list",.packages = c("dplyr","raster","sf","foreach","doParallel"),.export = c("VTN_2022","lavouras_stack","pasture","lavoura","mun_pj","r","areaPixel")) %dopar% {
     
     cod <- lista_cod_IBGE[i]
     
     # Select municipality
-    VTN_2022sub <- VTN_2022_filt %>% filter(code_muni == cod)
+    
+    VTN_2022sub <- VTN_2022 %>% filter(code_muni == cod)
     
     # Compute VTN values - corrigir a partir daqui!
     if (is.na(VTN_2022sub$VTN_unico)) {
@@ -307,12 +176,12 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE) {
     }
     
     # crop do raster de mun com o mun focal
-    mun_pj_sub <- filter(mun_pj,code_muni==cod)
+    mun_pj_sub <- filter(mun_pj,code_mn==cod)
     #sp_mun_pj_sub <- as(st_as_sfc(mun_pj_sub), "SpatialPolygons")# adicionei essa linha, se nao der certo, apagar
     vtn_m <- mask(VTN_mun,mun_pj_sub)
     vtn_c <- crop(vtn_m,mun_pj_sub)
     
-    # Return the result
+    # Return the result (adicionei o list no vtn_c)
     return(vtn_c)
   }
   
@@ -321,34 +190,56 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE) {
   
   
   # Print the results list
-  results
-  # # Return the list of results
-  # results
+  #results
+  # Convert the nested list to a one-dimensional list
+  results <- unlist(results, recursive = FALSE)
+  
 }
 
 
-# pacotes pra paralelizar, dentro da fucao
-library(foreach)
-library(doParallel)
+# funcao pra mosaicar
 
-# ok agora funciona, talvez valha pra qndo eh bem grande
+# funcao pra mosaicar de volta em um raster so!
 
-lista_teste <- lista_cod_IBGE[1:3]
+mosaic_f <- function(list_solutions,x,y){
+  
+  solutions_raster <- list() 
+  c = 1
+  for (i in seq(x,y,1)) {
+    
+    solutions_raster[[c]] <- list_solutions[[i]][[1]]
+    c = c + 1
+  }
+  
+  solutions_raster$fun <- mean
+  solutions_raster$na.rm <- TRUE
+  mosaic_scen <- do.call(mosaic,solutions_raster)
+  return(mosaic_scen)
+}
 
-tic("sleeping")
-teste_cod_chatgpt3 <- spatial_VTN4(lu = "lavoura",lista_cod_IBGE = lista_teste)
-#print("falling asleep...")
-#sleep_for_a_minute()
-#print("...waking up")
-toc()
-# Stop the parallel processing
-#stopCluster(getDoParWorkers())
 
-plot(teste_cod_chatgpt3[[1]][[1]])
-plot(teste_cod_chatgpt3[[1]][[2]])
-plot(teste_cod_chatgpt3[[2]])
+# testando a funcao!
+
+# lista_teste <- lista_cod_IBGE[1:10]
+# 
+# library(tictoc)
+# tic("sleeping")
+# teste_spatial_4 <- spatial_VTN4(lu = "lavoura",lista_cod_IBGE = lista_teste,n_cores = 15)
+# #print("falling asleep...")
+# #sleep_for_a_minute()
+# #print("...waking up")
+# toc()
+
+# testando funcao pra mosaicar! tem q dar um unlist antes!
 
 
+# teste_spatial_5 <- unlist(teste_spatial_4)
+# 
+# lavoura_mos <- mosaic_f(list_solutions = teste_spatial_4,x = 1,y = length(teste_spatial_4))
+# 
+# plot(lavoura_mos)
+
+# versao da funcao sem paralelizacao!!!
 
 spatial_VTN3 <- function(lu, lista_cod_IBGE) {
   
@@ -430,4 +321,134 @@ spatial_VTN3 <- function(lu, lista_cod_IBGE) {
   # # Return the list of results
   # results
 }
+
+
+# funcao com paralelizacao, com todos os lu ja incluidos!!
+# inclusao de silvicultura e preservacao!
+# essa eh a funcao mais atual, q inclui preservacao e silvicultura!
+# ja da pra ter todos os lu prontos!!
+
+spatial_VTN5 <- function(lu, lista_cod_IBGE,n_cores) {
+  
+  # Set number of cores to use
+  n_cores <- n_cores
+  
+  #registerDoParallel(makeCluster(n_cores))
+  
+  cl <- makeCluster(n_cores)
+  Sys.sleep(1)
+  registerDoParallel(cl)
+  
+  
+  # Compute area of pixel
+  areaPixel <- 980 * 1220 / 10^4
+  
+  # Iterate over each municipality code in parallel using foreach
+  # adicionei argumentos pra que os nucleos reconhecam objetos e pacotes
+  
+  results <- foreach(i = seq_along(lista_cod_IBGE), .combine = "list",.packages = c("dplyr","raster","sf","foreach","doParallel"),.export = c("VTN_2022","lavouras_stack","pasture","lavoura","mun_pj","r","areaPixel","silviculture","nat_veg")) %dopar% {
+    
+    cod <- lista_cod_IBGE[i]
+    
+    # Select municipality
+    
+    VTN_2022sub <- VTN_2022 %>% filter(code_muni == cod)
+    
+    # Compute VTN values - corrigir a partir daqui!
+    if (is.na(VTN_2022sub$VTN_unico)) {
+      if (lu == "pastagem") {
+        # Pastagem 
+        vtn <- VTN_2022sub$Pastagem.Plantada
+      } 
+      if(lu == "silvicultura"){
+        
+        vtn <- VTN_2022sub$Silvicultura.ou.pastagem.Natural
+        
+      }
+      
+      if(lu == "preservacao"){
+        # preservacao (floresta)
+        vtn <- VTN_2022sub$Preservação
+      } else {
+        # Lavoura
+        vtn <- c(VTN_2022sub$Lavoura.Aptidão.Boa,
+                 VTN_2022sub$Lavoura.Aptidão.Regular,
+                 VTN_2022sub$Lavoura.Aptidão.Restrita)
+        # adicionar aqui os if_elses da lavoura, substituindo valores faltantes
+        # Simplified if_else statements
+        if (is.na(vtn[1])) vtn[1] <- ifelse(is.na(vtn[2]), vtn[3], vtn[2])
+        if (is.na(vtn[2])) vtn[2] <- ifelse(is.na(vtn[1]), vtn[3], vtn[1])
+        if (is.na(vtn[3])) vtn[3] <- ifelse(is.na(vtn[1]), vtn[2], vtn[1])
+      }
+    } else {
+      if (lu == "pastagem"|lu=="silvicultura"|lu=="preservacao") {
+        # vale pra todos
+        vtn <- VTN_2022sub$VTN_unico
+      } else {
+        # Lavoura 
+        vtn <- rep(VTN_2022sub$VTN_unico, 3)
+      }
+    }
+    
+    # Multiply VTN values by area of pixel
+    vtn <- vtn * areaPixel
+    
+    # Compute fractions of land use
+    if (lu == "pastagem") {
+      # Pastagem
+      fractions <- pasture * (r == cod)
+    } 
+    if(lu=="silvicultura"){
+      # silvicultura
+      fractions <- silviculture * (r == cod)
+    }
+    
+    if(lu=="preservacao"){
+      
+      # preservacao
+      fractions <- nat_veg * (r == cod)
+    }else {
+      # Lavoura
+      fractions <- lavouras_stack * (r == cod)
+    }
+    
+    # Multiply fractions by VTN values and sum across all land use classes
+    if (lu == "pastagem"| lu=="silvicultura"|lu == "preservacao") {
+      # Pastagem
+      VTN_mun <- sum(fractions * vtn)
+    } else {
+      # Lavoura
+      VTN_mun <- sum(fractions[[1]] * vtn[1],
+                     fractions[[2]] *  vtn[2],
+                     fractions[[3]] *  vtn[3])
+    }
+    
+    # crop do raster de mun com o mun focal
+    mun_pj_sub <- filter(mun_pj,code_mn==cod)
+    #sp_mun_pj_sub <- as(st_as_sfc(mun_pj_sub), "SpatialPolygons")# adicionei essa linha, se nao der certo, apagar
+    vtn_m <- mask(VTN_mun,mun_pj_sub)
+    vtn_c <- crop(vtn_m,mun_pj_sub)
+    
+    # Return the result (adicionei o list no vtn_c)
+    return(vtn_c)
+  }
+  
+  # Stop the parallel processing
+  stopCluster(cl)
+  
+  
+  # Print the results list
+  #results
+  # Convert the nested list to a one-dimensional list
+  results <- unlist(results, recursive = FALSE)
+  
+}
+
+# preservacao ficou igual silvicultura, tem algo errado!
+
+# lista_teste <- VTN_2022$code_muni[1:2]
+# 
+# teste_spatial_pres <- spatial_VTN5(lu = "preservacao",lista_cod_IBGE = lista_teste,n_cores = 1)
+
+
 
