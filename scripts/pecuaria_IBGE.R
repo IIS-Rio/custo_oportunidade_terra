@@ -2,6 +2,10 @@
 
 library(sidrar)
 library(geobr)
+library(raster)
+library(fasterize)
+library(sf)
+
 #-------------------------------------------------------------------------------
 
 ################################################################################
@@ -13,15 +17,13 @@ library(geobr)
 
 # Com a producao pecuaria municipal, da pra ter tamanho dos rebanhos, pra dar um peso no valor. se desse pra atualizar a producao, seria ideal. calcularia o valor da producao ponderado pela quantidade de cabeças. falta apenas atualizar o valor.
 
-# acho que vai valer uma conversa com a jaque!
-
 # CO = (Me + Mi + Eg + Ho + Wo)/Pa
 # 
 # onde CO corresponde ao custo de oportunidade da produção animal (R$/ha), Me ao valor bruto da produção de carne (R$), Mi ao valor bruto da produção de leite (R$), Eg ao valor bruto da produção de ovos (R$), Ho ao valor bruto da produção de mel (R$), Wo ao valor bruto da produção de lã (R$) e Pa à área de pastagem (ha).
 
 ################################################################################
 
-# abrindo municipios Cerrado
+# abrindo municipios 
 
 br_mun <- read_municipality(year="2020")
 
@@ -74,6 +76,7 @@ leite_la <- lapply(mun_code,f,tabela=tabela_leite,classificacao=classific,catego
 leite_data_df <- as.data.frame(do.call(rbind,leite_la))
 
 #---- la --------------------------------------------------------------------
+
 # lista_mun <- unique(cer_mun$code_muni)
 
 tabela_leite <- 74
@@ -221,65 +224,67 @@ write.csv(valor_area_la,"tabelas_IBGE/CENSO_2021_la_rendimento_medio_ha.csv",row
 # rasterizando
 
 # raster base:
+
 r <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020/cropland_1km.tif")
 
-cer_mun <-cer_mun%>%
-  # filtrando uma linha por mun
-  filter(cat=="lavoura_temporaria")%>%
-  mutate(code_muni= as.character(code_muni))%>%
-  left_join(y = valor_area_pastagem,by=c("code_muni"="Município (Código)"))
-
-
+# cer_mun <-cer_mun%>%
+#   # filtrando uma linha por mun
+#   filter(cat=="lavoura_temporaria")%>%
+#   mutate(code_muni= as.character(code_muni))%>%
+#   left_join(y = valor_area_pastagem,by=c("code_muni"="Município (Código)"))
 # reproject to match the raster dataset
 
-cer_mun_pj <- st_transform(x = cer_mun,crs = crs(r)
+br_mun_pj <- st_transform(x = br_mun,crs = crs(r)
 )
 
-cer_mun_pj <- st_cast(cer_mun_pj,to="MULTIPOLYGON")
+# abrindo dados carne
 
-names(cer_mun_pj)[39] <- "reais_ha_carne"
+carne <- read.csv("tables_IBGE/CENSO_2021_carne_rendimento_medio_ha.csv")
+names(carne)[5] <- "code_muni"
+# cer_mun_pj <- st_cast(cer_mun_pj,to="MULTIPOLYGON")
 
-carne_r <- fasterize(sf = cer_mun_pj,raster = r, field="reais_ha_carne",fun="first")
+# adicionar campo pra rasterizar
 
-# ajustar extent
+br_mun_pj_2 <- left_join(br_mun_pj,carne[,c(5,11)])
 
-carne_r <- crop(carne_r,cer_pj)
+carne_r <- fasterize(sf = br_mun_pj_2,raster = r, field="reais_ha_carne",fun="first")
 
-plot(carne_r)
+# salvando (pra cruzar com mapbiomas)- da pra salvar so o produto final
 
-# salvando (pra cruzar com mapbiomas)
-raster::writeRaster(carne_r,"/dados/projetos_andamento/TRADEhub/GLOBIOMbr/oc/rendimento_medio_ha_carne_Mun_Cerrado_2017.tif",overwrite=TRUE)
+# raster::writeRaster(carne_r,"/dados/pessoal/francisco/custo_oportunidade_terra/raster_IBGE/rendimento_medio_ha_carne_IBGE_2021.tif",overwrite=TRUE)
 
+# abrindo dados de leite
 
-cer_mun_pj <- cer_mun_pj%>%
-  left_join(y = valor_area_la[,c(6,15)],by=c("code_muni"="Município (Código)"))
+leite <- read.csv("tables_IBGE/CENSO_2021_leite_rendimento_medio_ha.csv")
 
-la_r <- fasterize(sf = cer_mun_pj,raster = r, field="reais_ha_la",fun="first")
+names(leite)[6] <- "code_muni"
 
-# ajustar extent
+br_mun_pj_2 <- br_mun_pj_2%>%
+  left_join(y = leite[,c(6,15)])
 
-la_r <- crop(la_r,cer_pj)
-
-plot(la_r)
-summary(la_r[])
-
-# salvando (pra cruzar com mapbiomas)
-raster::writeRaster(la_r,"/dados/projetos_andamento/TRADEhub/GLOBIOMbr/oc/rendimento_medio_ha_la_Mun_Cerrado_2017.tif",overwrite=TRUE)
-
-
-cer_mun_pj <- cer_mun_pj%>%
-  left_join(y = valor_area_leite[,c(6,15)],by=c("code_muni"="Município (Código)"))
-names(valor_area_leite)  
-
-
-leite_r <- fasterize(sf = cer_mun_pj,raster = r, field="reais_ha_leite",fun="first")
-
-# ajustar extent
-
-leite_r <- crop(leite_r,cer_pj)
-
-plot(leite_r)
-summary(leite_r[])
+leite_r <- fasterize(sf = br_mun_pj_2,raster = r, field="reais_ha_leite",fun="first")
 
 # salvando (pra cruzar com mapbiomas)
-raster::writeRaster(leite_r,"/dados/projetos_andamento/TRADEhub/GLOBIOMbr/oc/rendimento_medio_ha_leite_Mun_Cerrado_2017.tif",overwrite=TRUE)
+# raster::writeRaster(la_r,"/dados/projetos_andamento/TRADEhub/GLOBIOMbr/oc/rendimento_medio_ha_la_Mun_Cerrado_2017.tif",overwrite=TRUE)
+
+la <- read.csv("tables_IBGE/CENSO_2021_la_rendimento_medio_ha.csv")
+
+names(la)[6] <- "code_muni"
+
+br_mun_pj_2 <- br_mun_pj_2%>%
+  left_join(y = la[,c(6,15)])
+
+la_r <- fasterize(sf = br_mun_pj_2,raster = r, field="reais_ha_la",fun="first")
+
+plot(log(la_r))
+
+# somando atividades pecuarias
+
+pecuaria <- carne_r+la_r+leite_r
+summary(pecuaria[])
+plot(log(pecuaria))
+plot(pecuaria>20000)
+
+# salvando (pra cruzar com mapbiomas)
+
+raster::writeRaster(pecuaria,"/dados/pessoal/francisco/custo_oportunidade_terra/raster_IBGE/rendimento_medio_ha_pecuaria_IBGE_2021.tif",overwrite=TRUE)
