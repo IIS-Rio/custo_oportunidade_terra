@@ -95,7 +95,7 @@ f <- function(x,tabela,classificacao,period){
 
 # n of groups to stratify the access to the API
 
-num_groups = round(length(mun$code_muni)/500,0)
+num_groups = round(length(mun$code_muni)/200,0)
 
 list_df <- mun %>% 
   group_by((row_number()-1) %/% (n()/num_groups)) %>%
@@ -108,15 +108,11 @@ mun_code <- lapply(list_df,function(x)as.character(unique(x$code_muni)))
 
 # rodando pra lavoura permanente
 
-perm_data <- lapply(mun_code[[1]][1],f,tabela=perm,classificacao=classific_perm,period=period)
+perm_data <- lapply(mun_code,f,tabela=perm,classificacao=classific_perm,period=period)
 
-# nao ta rolando usar o sidra r
+# nao ta rolando usar API IBGE no servidor
 
 # error:0A000152:SSL routines::unsafe legacy renegotiation disabled
-
-# ver oq pode ser
-
-perm <- get_sidra(variable = 215,x = perm,period = 2022)
 
 # combining the data again
 
@@ -126,7 +122,7 @@ perm_data_df <- as.data.frame(do.call(rbind,perm_data))
 
 perm_data_df$cat <- "lavoura_permanente"
 
-temp_data <- lapply(mun_code,f,tabela=temp,classificacao=classific_temp) 
+temp_data <- lapply(mun_code,f,tabela=temp,classificacao=classific_temp,period=period) 
 
 temp_data_df <- as.data.frame(do.call(rbind,temp_data))
 
