@@ -4,6 +4,10 @@
 
 # por enquanto, nao to conseguindo fazer a API do SIDRA funcionar no servidor. Mas funciona no meu PC! se nao conseguir resolver, baixar manualmente mesmo.
 
+# alternativas de acesso a API tb funcionam no meu PC, mas nao no servidor.
+
+# forum: https://discourse.curso-r.com/t/erro-em-webscraping-unsafe-legacy-renegotiation-disabled/2117/8
+
 # foram estimados três valores para cada município, a partir dos resultados das três equações a
 # seguir:
 #   
@@ -68,15 +72,10 @@ classific_temp <- "c81" #Grupos de área total(20):
 category  <-  list(0)
 
 # funcao pra baixar os dados
+
 f <- function(x,tabela,classificacao,period){
   
   library(sidrar)
-  
-  handle <- new_handle(
-    sslversion = 3,
-    ssl_verifypeer = FALSE,
-    cainfo = system.file("CurlSSL", "cacert.pem", package = "RCurl"),
-    verbose = TRUE)
   
   get_sidra(tabela,
             geo=geo,
@@ -84,8 +83,7 @@ f <- function(x,tabela,classificacao,period){
             variable = variavel,
             classific = classificacao,
             category = category,
-            period = period,
-            curl = handle # use the custom curl handle
+            period = period
             )
 
 }
@@ -123,6 +121,7 @@ perm <- get_sidra(variable = 215,x = perm,period = 2022)
 # combining the data again
 
 perm_data_df <- as.data.frame(do.call(rbind,perm_data))
+
 # rodando pra lavoura temporaria
 
 perm_data_df$cat <- "lavoura_permanente"

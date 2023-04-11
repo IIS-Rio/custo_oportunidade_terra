@@ -54,9 +54,15 @@ lavoura_aptidao_restrita <- raster("/dados/projetos_andamento/custo_oportunidade
 
 lavouras_stack <- stack(lavoura_aptidao_boa,lavoura_aptidao_media,lavoura_aptidao_restrita)
 
+silviculture <- rasters[[7]] 
+
+# soma os raster de veg nativa!(forest, grassland,otn,wetland)
+
+nat_veg <- rasters[[2]] + rasters[[3]] + rasters[[5]]+rasters[[8]]
+
 #---- funcoes ------------------------------------------------------------------
 
-spatial_VTN4 <- function(lu, lista_cod_IBGE,n_cores) {
+spatial_VTN5 <- function(lu, lista_cod_IBGE,n_cores) {
   
   # Set number of cores to use
   n_cores <- n_cores
@@ -74,7 +80,7 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE,n_cores) {
   # Iterate over each municipality code in parallel using foreach
   # adicionei argumentos pra que os nucleos reconhecam objetos e pacotes
   
-  results <- foreach(i = seq_along(lista_cod_IBGE), .combine = "list",.packages = c("dplyr","raster","sf","foreach","doParallel"),.export = c("VTN_2022","lavouras_stack","pasture","lavoura","mun_pj","r","areaPixel")) %dopar% {
+  results <- foreach(i = seq_along(lista_cod_IBGE), .combine = "list",.packages = c("dplyr","raster","sf","foreach","doParallel"),.export = c("VTN_2022","lavouras_stack","pasture","lavoura","mun_pj","r","areaPixel","silviculture","nat_veg")) %dopar% {
     
     cod <- lista_cod_IBGE[i]
     
@@ -85,9 +91,20 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE,n_cores) {
     # Compute VTN values - corrigir a partir daqui!
     if (is.na(VTN_2022sub$VTN_unico)) {
       if (lu == "pastagem") {
-        # Pastagem
+        # Pastagem 
         vtn <- VTN_2022sub$Pastagem.Plantada
-      } else {
+      } 
+      if(lu == "silvicultura"){
+        
+        vtn <- VTN_2022sub$Silvicultura.ou.pastagem.Natural
+        
+      }
+      
+      if(lu == "preservacao"){
+        # preservacao (floresta)
+        vtn <- VTN_2022sub$Preservação
+      } 
+      if (lu=="lavoura") {
         # Lavoura
         vtn <- c(VTN_2022sub$Lavoura.Aptidão.Boa,
                  VTN_2022sub$Lavoura.Aptidão.Regular,
@@ -99,10 +116,11 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE,n_cores) {
         if (is.na(vtn[3])) vtn[3] <- ifelse(is.na(vtn[1]), vtn[2], vtn[1])
       }
     } else {
-      if (lu == "pastagem") {
-        # Pastagem
+      if (lu == "pastagem"|lu=="silvicultura"|lu=="preservacao") {
+        # vale pra todos
         vtn <- VTN_2022sub$VTN_unico
-      } else {
+      } 
+      if (lu=="lavoura") {
         # Lavoura 
         vtn <- rep(VTN_2022sub$VTN_unico, 3)
       }
@@ -115,18 +133,30 @@ spatial_VTN4 <- function(lu, lista_cod_IBGE,n_cores) {
     if (lu == "pastagem") {
       # Pastagem
       fractions <- pasture * (r == cod)
-    } else {
+    } 
+    if(lu=="silvicultura"){
+      # silvicultura
+      fractions <- silviculture * (r == cod)
+    }
+    
+    if(lu=="preservacao"){
+      
+      # preservacao
+      fractions <- nat_veg * (r == cod)
+    }
+    if (lu=="lavoura") {
       # Lavoura
       fractions <- lavouras_stack * (r == cod)
     }
     
     # Multiply fractions by VTN values and sum across all land use classes
-    if (lu == "pastagem") {
+    if (lu == "pastagem"| lu=="silvicultura"|lu == "preservacao") {
       # Pastagem
       VTN_mun <- sum(fractions * vtn)
-    } else {
+    } 
+    if (lu=="lavoura") {
       # Lavoura
-      VTN_mun <- sum(fractions[[1]] * vtn[1],
+      VTN_mun <- sum(fractions[[1]] *  vtn[1],
                      fractions[[2]] *  vtn[2],
                      fractions[[3]] *  vtn[3])
     }
@@ -172,12 +202,51 @@ mosaic_f <- function(list_solutions,x,y){
 
 #-------------------------------------------------------------------------------
 
+# rodando pra pastagem
+
+spatial_pastagem <- spatial_VTN5(lu = "pastagem",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
+
+spatial_pastagem <- unlist(spatial_pastagem)
+
+pastagem_mos <- mosaic_f(list_solutions = spatial_pastagem,x = 1,y = length(spatial_pastagem))
+
+writeRaster(pastagem_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_pastureland_2022.tif",overwrite=TRUE)
+
+
+rm(spatial_pastagem,pastagem_mos)
+
 # rodando pra lavoura
 
-spatial_lavoura <- spatial_VTN4(lu = "lavoura",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
+spatial_lavoura <- spatial_VTN5(lu = "lavoura",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
 
 spatial_lavoura <- unlist(spatial_lavoura)
 
 lavoura_mos <- mosaic_f(list_solutions = spatial_lavoura,x = 1,y = length(spatial_lavoura))
 
-writeRaster(lavoura_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_cropland_2022.tif")
+writeRaster(lavoura_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_cropland_2022.tif",overwrite=TRUE)
+
+rm(spatial_lavoura,lavoura_mos)
+
+# rodando pra silvicultura
+
+spatial_silvicultura <- spatial_VTN5(lu = "silvicultura",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
+
+spatial_silvicultura <- unlist(spatial_silvicultura)
+
+silvicultura_mos <- mosaic_f(list_solutions = spatial_silvicultura,x = 1,y = length(spatial_silvicultura))
+
+writeRaster(silvicultura_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_silviculture_2022.tif",overwrite=TRUE)
+
+rm(spatial_silvicultura,silvicultura_mos)
+
+# rodando pra floresta
+
+spatial_forest <- spatial_VTN5(lu = "preservacao",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
+
+spatial_forest <- unlist(spatial_forest)
+
+forest_mos <- mosaic_f(list_solutions = spatial_forest,x = 1,y = length(spatial_forest))
+
+writeRaster(forest_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_natural_veg_2022.tif",overwrite=TRUE)
+
+rm(spatial_forest,forest_mos)
