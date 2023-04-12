@@ -197,9 +197,40 @@ area_relativa <- teste%>%
 
 #---- adicionando componente espacial e rasterizando os dados ------------------
 
-cer_mun <-cer_mun%>%
-  mutate(code_muni= as.character(code_muni))%>%
-  left_join(y = custo,by=c("code_muni"="Município (Código)"))
+
+agricultura <- read.csv("tables_IBGE/PAM_IBGE_2021_rendimento_medio_ha.csv")
+
+
+# lavoura permanente
+permanente <- agricultura %>%
+  filter(cat=='lavoura_permanente')
+# lavoura temporaria
+temporaria <- agricultura %>%
+  filter(cat=='lavoura_temporaria')
+
+# calculando razao entre 2 tipos de cultura
+agri2 <- permanente %>%
+  # renomeando colunas pra nao dar erro no join
+  rename(planted_area_ha_perm=planted_area_ha)%>%
+  rename(avg_value_ha_perm=avg_value_ha)%>%
+  left_join(temporaria[,c(5,9,10)])%>%
+  # razap
+  mutate(area_ratio=planted_area_ha_perm/planted_area_ha)%>%
+  mutate(w = if_else(is.na(avg_value_ha_perm), 0, (area_ratio - min(area_ratio, na.rm = TRUE)) / (max(area_ratio, na.rm = TRUE) - min(area_ratio, na.rm = TRUE))),
+         w = if_else(is.na(avg_value_ha), 1, w)) %>%
+  # agrupando colunas pra manter
+  group_by_at(vars(c(1:8, 14))) %>%
+  # calculando a media
+  mutate(weighted_avg = if_else(is.na(avg_value_ha_perm), avg_value_ha, if_else(is.na(avg_value_ha), avg_value_ha_perm, (avg_value_ha_perm * w) + (avg_value_ha * (1 - w)))))%>%
+# substituindo NAs por o
+mutate(weighted_avg=if_else(is.na(weighted_avg),true = 0,weighted_avg))
+            
+
+# o valor ponderado pode ser multiplicado pelo raster de cropland!
+
+mun <-mun%>%
+  #mutate(code_muni= as.character(code_muni))%>%
+  left_join(y = agri2,by=c("code_muni"="Município..Código."))
 
 # rasterizando
 
@@ -208,36 +239,21 @@ r <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline
 
 # reproject to match the raster dataset
 
-cer_mun_pj <- st_transform(x = cer_mun,crs = crs(r)
+mun_pj <- st_transform(x = mun,crs = crs(r)
 )
 
-# lavoura permanente
-permanente <- cer_mun_pj %>%
-  filter(cat=='lavoura_permanente')
-# lavoura temporaria
-temporaria <- cer_mun_pj %>%
-  filter(cat=='lavoura_temporaria')
-# padronizando tudo pra 1 geometria só
-permanente <- st_cast(permanente,to="MULTIPOLYGON")
-temporaria <- st_cast(temporaria,to="MULTIPOLYGON")
-
-permanente_r <- fasterize(sf = permanente,raster = r, field="avg_value_ha",fun="first")
-
-temporaria_r <- fasterize(sf = temporaria,raster = r, field="avg_value_ha",fun="first")
 
 
-# ajustar extent
+lavoura_r <- fasterize(sf = mun_pj,raster = r, field="weighted_avg",fun="first")
 
-permanente_r_c <- crop(permanente_r,cer_pj)
-plot(permanente_r_c)
 
-temporaria_r_c <- crop(temporaria_r,cer_pj)
-plot(temporaria_r_c)
+plot(log(lavoura_r))
 
 # salvando (pra cruzar com mapbiomas)
-raster::writeRaster(permanente_r_c,"/dados/projetos_andamento/TRADEhub/GLOBIOMbr/oc/rendimento_medio_ha_lavoura_permanente.tif")
 
-raster::writeRaster(temporaria_r_c,"/dados/projetos_andamento/TRADEhub/GLOBIOMbr/oc/rendimento_medio_ha_lavoura_temporaria.tif")
+raster::writeRaster(lavoura_r,"/dados/pessoal/francisco/custo_oportunidade_terra/raster_IBGE/rendimento_medio_ha_lavoura_ponderada_IBGE_2021.tif")
+
+
 
 
 

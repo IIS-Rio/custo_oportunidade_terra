@@ -85,34 +85,25 @@ write.csv(valor_area_silvi,"tabelas_IBGE/PAM_IBGE_rendimento_medio_ha_silvicultu
 
 #---- espacializando -----------------------------------------------------------
 
-# limites Cerrado
-
-cer <- read_biomes(simplified = T)%>%
-  filter(code_biome==3)
-
-cer_pj <- st_transform(x = cer,crs = crs(r))
+valor_area_silvi <- read.csv("tables_IBGE/PAM_IBGE_rendimento_medio_ha_silvicultura.csv")
 
 # raster base:
 r <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020/cropland_1km.tif")
 
+# adequando projecao
+
+mun_pj <- st_transform(x = mun,crs = crs(r))
+
 cer_mun_pj <- st_transform(x = cer_mun,crs = crs(r)
 )
 
-cer_mun_pj <- st_cast(cer_mun_pj,to="MULTIPOLYGON")
+mun_pj <- mun_pj%>%
+  left_join(y = valor_area_silvi[,c(6,15)],by=c("code_muni"="Município..Código."))
 
-cer_mun_pj$code_mn <- as.character(cer_mun_pj$code_mn)
-
-cer_mun_pj <- cer_mun_pj%>%
-  left_join(y = valor_area_silvi[,c(6,15)],by=c("code_mn"="Município (Código)"))
-
-silvicultura_r <- fasterize(sf = cer_mun_pj,raster = r, field="reais_ha",fun="first")
-
-# ajustar extent
-
-silvicultura_r <- crop(silvicultura_r,cer_pj)
+silvicultura_r <- fasterize(sf = mun_pj,raster = r, field="reais_ha",fun="first")
 
 plot(silvicultura_r)
 summary(silvicultura_r[])
 
 # salvando (pra cruzar com mapbiomas)
-raster::writeRaster(silvicultura_r,"/dados/projetos_andamento/TRADEhub/GLOBIOMbr/oc/rendimento_medio_ha_silvicultura_2021.tif")
+raster::writeRaster(silvicultura_r,"/dados/pessoal/francisco/custo_oportunidade_terra/raster_IBGE/rendimento_medio_ha_silvicultura_IBGE_2021.tif")
