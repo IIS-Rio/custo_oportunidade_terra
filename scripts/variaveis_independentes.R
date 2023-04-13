@@ -209,7 +209,7 @@ info_sidra(tabela_gdp)
 
 tabela_gdp <- 5938
 period_gdp <- "2020"
-variable_gdp <- 496 #496 Prticipação do produto interno bruto a preços correntes no produto interno bruto a preços correntes do Brasil (%)
+variable_gdp <- 496 #496 Prticipação do produto interno bruto a preços correntes no produto interno bruto a preços correntes do Brasil (%). tem q ser aq tem agricultura!!
 
 agricultural_gdp_data <- lapply(mun_code,f2,tabela=tabela_gdp,classificacao=NULL,period=period_gdp,variavel=variable_gdp)
 
