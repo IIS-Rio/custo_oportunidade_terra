@@ -10,7 +10,7 @@
 #  7. Proportion (%) of landowners in relation to total agricultural producers
 #  8. Distance (in 100 km) to the nearest municipality with more than 500 thousand inhabitants
 #  
-#  research more variables -- for instance, agriculture suitability!
+#  research more variables -- for instance, agriculture suitability!, proportion of each land-use
 
 #---- pacotes ------------------------------------------------------------------
 
@@ -20,7 +20,7 @@ library(dplyr)
 library(tidyr)
 
 # ------------------------------------------------------------------------------
-#  1.degree of urbanization (prop. pop urbana/pop total)
+#  1.degree of urbanization (prop. pop urbana/pop total) ok
 # ------------------------------------------------------------------------------
 #  
 #  source: IBGE
@@ -182,34 +182,43 @@ write.csv(prop_area,"tabelas_IbGE/IBGE_2017_prop_areaover100ha.csv",row.names = 
 #  4. Value of agricultural subsidy/ha 
 # ------------------------------------------------------------------------------
 
-# tem um limite de atr 1milhao de linhas, q eu posso aumentar. pq nao vme dados completos
+# tem um limite de ate 1milhao de linhas, q eu posso aumentar. pq nao vem dados completos
+# a área de custeio pode estar relacionada tanto aos recursos financeiros que serão utilizados para cobrir os gastos envolvidos na produção da safra OU a área que recebeu recursos. Dependendo do range de valores, da pra determinar se eh um ou outro. Como nao tem unidadade, se a ordem de grandeza dos valores de contrato e area de custeio forem diferentes, um eh $ e outro eh área. Se for similar, os 2 sao dinheiro.
+# filtro 2021
 
-URL <- "https://olinda.bcb.gov.br/olinda/servico/SICOR/versao/v2/odata/CusteioInvestimentoComercialIndustrialSemFiltros?$top=200000&$format=text/csv&$select=cdEstado,nomeUF,cdMunicipio,Municipio,AnoEmissao,Atividade,VlCusteio,VlInvestimento,VlComercializacao,VlIndustrializacao,codMunicIbge,AreaCusteio,AreaInvestimento"
+# aqui tem as operacoes possiveis em cada campo: https://olinda.bcb.gov.br/olinda/servico/ajuda
+
+URL <- "https://olinda.bcb.gov.br/olinda/servico/SICOR/versao/v2/odata/CusteioMunicipioProduto?$top=1000000&$filter=AnoEmissao%20eq%20'2021'&$format=text/csv&$select=Municipio,AnoEmissao,VlCusteio,Atividade,codIbge,AreaCusteio"
 
 download.file(URL,destfile = "tabelas_IBGE/agri_subsidy.csv")
 
 library(readr)
 agri_subsidy <- read_csv("tabelas_IBGE/agri_subsidy.csv")
 
-library(GetBCBData)
-# uma possibilidade
-id <- c("Concessões - Pessoas jurídicas - Crédito rural total"=20689)
-gbcbd_get_series(id,first.date = "2022-01-01",last.date = "2022-12-31")
+# checando range valores vl custeio e area custeio
+summary(agri_subsidy_2021$VlCusteio/10^4)
+summary(as.numeric(gsub(pattern = ",",replacement = ".",x = agri_subsidy_2021$AreaCusteio))/10^4)# eh area!
 
-length(unique(agri_subsidy$codMunicIbge))
+# agregando dados
 
-# conferir oq signigicam as variaveis
+agri_subsidy_agg <- agri_subsidy %>%
+  mutate(AreaCusteio=as.numeric(gsub(pattern = ",",replacement = ".",x = AreaCusteio)))%>%
+  group_by_at(c(1,2,5))%>%
+  summarise(VlCusteio=sum(VlCusteio),AreaCusteio=sum(AreaCusteio))
+
+write.csv(agri_subsidy_agg,"tabelas_IBGE/Matriz_Cred_Rural_2021_agg.csv",row.names = F)
 
 # ------------------------------------------------------------------------------
 #  5. Proportion (%) of the gross domestic product (GDP) in the agricultural sector in relation to total municipal GDP 
 # ------------------------------------------------------------------------------
 
+tabela_gdp <- 5938
 info_sidra(tabela_gdp) 
 
 
-tabela_gdp <- 5938
 period_gdp <- "2020"
-variable_gdp <- 496 #496 Prticipação do produto interno bruto a preços correntes no produto interno bruto a preços correntes do Brasil (%). tem q ser aq tem agricultura!!
+variable_gdp <- 516 #496 Prticipação do produto interno bruto a preços correntes no produto interno bruto a preços correntes do Brasil (%). tem q ser aq tem agricultura!!
+# 20 516 Participação do valor adicionado bruto a preços correntes da agropecuária no valor adicionado bruto a preços correntes total (%)
 
 agricultural_gdp_data <- lapply(mun_code,f2,tabela=tabela_gdp,classificacao=NULL,period=period_gdp,variavel=variable_gdp)
 
@@ -226,3 +235,16 @@ write.csv(agricultural_gdp_df,"tabelas_IbGE/IBGE_2021_agricultural_GDP.csv",row.
 # ------------------------------------------------------------------------------
 
 #...continuar
+
+#-------------------------------------------------------------------------------
+#  8. Distance (in 100 km) to the nearest municipality with more than 500 thousand inhabitants
+#-------------------------------------------------------------------------------
+
+# get centroids of all municipalities
+# get pop. data for all centroids. 
+# classify them into binary more than 500 thousand and less.
+# run moving window
+
+
+
+
