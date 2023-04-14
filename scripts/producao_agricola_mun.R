@@ -8,6 +8,8 @@
 
 # forum: https://discourse.curso-r.com/t/erro-em-webscraping-unsafe-legacy-renegotiation-disabled/2117/8
 
+#https://github.com/rapid7/metasploit-framework/issues/16954
+
 # foram estimados três valores para cada município, a partir dos resultados das três equações a
 # seguir:
 #   
@@ -103,7 +105,7 @@ list_df <- mun %>%
 
 
 #listing mun code
-
+mun_code <- "3550308"
 mun_code <- lapply(list_df,function(x)as.character(unique(x$code_muni)))
 
 # rodando pra lavoura permanente
@@ -256,4 +258,7 @@ raster::writeRaster(lavoura_r,"/dados/pessoal/francisco/custo_oportunidade_terra
 
 
 
+IBGE <- raster("/dados/pessoal/francisco/custo_oportunidade_terra/raster_IBGE/rendimento_medio_ha_IBGE_agg_2021.tif")
 
+plot(IBGE)
+summary(IBGE[])

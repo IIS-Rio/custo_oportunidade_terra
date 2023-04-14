@@ -45,6 +45,11 @@ writeRaster(VTN_ha,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VT
 
 # brincando de plotar por enquanto
 
+
+VTN_ha <- raster("/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_ha_RF_agg_2022.tif")
+
+plot(VTN_ha>0)
+
 library(scales)
 library(ggmap)
 
@@ -70,7 +75,7 @@ summary(log10(df_no0$layer))
 summary(df_no0$layer)
 # falta tirar os NAs no 
 
-
+nrow(df[df$layer>513300,])/nrow(df)
 nrow(df_no0[df_no0$layer>40000,])/nrow(df_no0)
 row(df_no0[df_no0$layer>40000,])/nrow(df_no0)
 nrow(df_no0[df_no0$layer<500,])/nrow(df_no0)
@@ -98,3 +103,11 @@ df_no0%>%
     log_scale+
     theme_void()
   
+max(df_no0$layer)
+
+VTN_2022 <- read.csv("/dados/pessoal/francisco/custo_oportunidade_terra/mun_VTN/mun_VTN_2022_NA_filled.csv")
+
+
+head(VTN_2022)
+
+max(VTN_2022$Lavoura.Aptidão.Boa,na.rm = T)
