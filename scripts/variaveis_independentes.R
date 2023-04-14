@@ -18,7 +18,7 @@ library(sidrar) # acesso API
 library(geobr)
 library(dplyr)
 library(tidyr)
-
+library(sf)
 # ------------------------------------------------------------------------------
 #  1.degree of urbanization (prop. pop urbana/pop total) ok
 # ------------------------------------------------------------------------------
@@ -245,6 +245,51 @@ write.csv(agricultural_gdp_df,"tabelas_IbGE/IBGE_2021_agricultural_GDP.csv",row.
 # classify them into binary more than 500 thousand and less.
 # run moving window
 
+# estimativa populacional
+#https://www.ibge.gov.br/estatisticas/sociais/populacao/9103-estimativas-de-populacao.html
+
+library(readxl)
+Proj_pop_2021 <- read_excel("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/Proj_pop_2021_tabela6579.xlsx")[-(1:5),]
 
 
+#urb_conc <- read_urban_concentrations()
+read_c
+names(Proj_pop_2021) <- c("Nivel","code_muni","nm_muni","pop_est_2021","unidade")
 
+# centroides municipios brasil
+# raster base:
+
+r <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020/cropland_1km.tif")
+
+# reproject to match the raster dataset
+
+mun_pj <- st_transform(x = mun,crs = crs(r))%>%
+  mutate(code_muni=as.character(code_muni))
+
+# adicionar projecao pop
+
+
+mun_pj_pop <- left_join(mun_pj,Proj_pop_2021)
+
+# calculando centroide
+
+mun_pj_pop <- st_centroid(mun_pj_pop)
+
+# classificando em maior ou menor que 500k
+
+mun_pj_pop <- mun_pj_pop%>%
+  mutate(pop_est_2021=as.numeric(pop_est_2021))%>%
+  mutate(pop_size_over500k=if_else((pop_est_2021)>=500000,false = 0,true=1))
+
+# rasterizando
+# pensar melhor, se tem algo tipo centro urbano, e nao centroide pra usar. E como rasterizar data points!
+pop_r <- fasterize(sf = mun_pj_pop,raster = r, field="pop_size_over500k",fun="first")
+
+
+# checar funcao pra calcular raster de distancia com 2 classes. euclidean distance
+
+# https://rdrr.io/github/adamlilith/fasterRaster/man/fasterRastDistance.html
+#or library(gdistance)
+# costDistance()
+
+# essa aqui ja usei: d <- gridDistance(rl40,origin=2,omit=0) 
