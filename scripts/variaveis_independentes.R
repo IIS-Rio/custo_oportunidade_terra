@@ -252,6 +252,18 @@ library(readxl)
 Proj_pop_2021 <- read_excel("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/Proj_pop_2021_tabela6579.xlsx")[-(1:5),]
 
 
+# localidades
+
+localidades <- st_read("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/BR_Localidades_2010_v1.shp")
+
+# vendo oq tem de comum
+
+loc_sub <- filter(localidades,CD_GEOCODM %in% mun_pj_pop$code_muni&NM_CATEGOR=="CIDADE")
+
+# usar a localizacao das localidades, nao do municipio!
+
+
+
 #urb_conc <- read_urban_concentrations()
 read_c
 names(Proj_pop_2021) <- c("Nivel","code_muni","nm_muni","pop_est_2021","unidade")
@@ -263,33 +275,66 @@ r <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline
 
 # reproject to match the raster dataset
 
-mun_pj <- st_transform(x = mun,crs = crs(r))%>%
-  mutate(code_muni=as.character(code_muni))
+loc_sub_pj <- st_transform(x = loc_sub,crs = crs(r))%>%
+  rename(code_muni=CD_GEOCODM)
 
 # adicionar projecao pop
 
 
-mun_pj_pop <- left_join(mun_pj,Proj_pop_2021)
+loc_pj_pop <- left_join(loc_sub_pj,Proj_pop_2021)
 
 # calculando centroide
 
-mun_pj_pop <- st_centroid(mun_pj_pop)
+# mun_pj_pop <- st_centroid(mun_pj_pop)
 
 # classificando em maior ou menor que 500k
 
-mun_pj_pop <- mun_pj_pop%>%
+loc_pj_pop <- loc_pj_pop%>%
   mutate(pop_est_2021=as.numeric(pop_est_2021))%>%
   mutate(pop_size_over500k=if_else((pop_est_2021)>=500000,false = 0,true=1))
 
+plot(st_geometry(loc_pj_pop))
+
+# pensar em como rasterizar sem perder a info espacial!algum intersect entre o ponto e um raster
+
 # rasterizando
 # pensar melhor, se tem algo tipo centro urbano, e nao centroide pra usar. E como rasterizar data points!
-pop_r <- fasterize(sf = mun_pj_pop,raster = r, field="pop_size_over500k",fun="first")
+library(fasterize)
+library(stars)
 
 
-# checar funcao pra calcular raster de distancia com 2 classes. euclidean distance
 
-# https://rdrr.io/github/adamlilith/fasterRaster/man/fasterRastDistance.html
-#or library(gdistance)
-# costDistance()
+#  opcao de gerar distance raster so com os pontos maiores de 500k
 
-# essa aqui ja usei: d <- gridDistance(rl40,origin=2,omit=0) 
+# Create a raster with the desired resolution and extent
+raster_template <- raster(extent(r), res = res(r))
+
+
+localities_over500 <- filter(loc_pj_pop,pop_size_over500k==1)
+
+# Convert sf object to SpatialPoints object
+nc_sp <- as(localities_over500, "Spatial")
+
+# Extract the coordinates from the sf object
+coords <- st_coordinates(localities_over500)
+
+# Create a data.frame with the coordinates
+df <- data.frame(coords)
+
+
+class(localities_over500)
+
+# Calculate the minimum distance from each pixel to the nearest point
+distance_raster_km <- distanceFromPoints(raster_template,df)/1000
+
+# clip country
+
+br <- read_country()
+br_pj <- st_transform(br, crs = crs(r))
+
+distance_raster_km_c <- crop(distance_raster_km,br_pj)
+distance_raster_km_m <- mask(distance_raster_km_c,br_pj)
+plot(distance_raster_km_m)
+
+
+writeRaster(distance_raster_km_m,"/dados/projetos_andamento/custo_oportunidade/raster_IBGE/distance_Cities_over_500k.tif")
