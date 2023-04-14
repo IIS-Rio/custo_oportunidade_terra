@@ -10,7 +10,7 @@
 #  7. Proportion (%) of landowners in relation to total agricultural producers
 #  8. Distance (in 100 km) to the nearest municipality with more than 500 thousand inhabitants
 #  
-#  research more variables -- for instance, agriculture suitability!
+#  research more variables -- for instance, agriculture suitability!, proportion of each land-use
 
 #---- pacotes ------------------------------------------------------------------
 
@@ -206,7 +206,7 @@ agri_subsidy_agg <- agri_subsidy %>%
   group_by_at(c(1,2,5))%>%
   summarise(VlCusteio=sum(VlCusteio),AreaCusteio=sum(AreaCusteio))
 
-write.csv(agri_subsidy_agg,"Matriz_Cred_Rural_2021_agg.csv",row.names = F)
+write.csv(agri_subsidy_agg,"tabelas_IBGE/Matriz_Cred_Rural_2021_agg.csv",row.names = F)
 
 # ------------------------------------------------------------------------------
 #  5. Proportion (%) of the gross domestic product (GDP) in the agricultural sector in relation to total municipal GDP 
@@ -235,3 +235,16 @@ write.csv(agricultural_gdp_df,"tabelas_IbGE/IBGE_2021_agricultural_GDP.csv",row.
 # ------------------------------------------------------------------------------
 
 #...continuar
+
+#-------------------------------------------------------------------------------
+#  8. Distance (in 100 km) to the nearest municipality with more than 500 thousand inhabitants
+#-------------------------------------------------------------------------------
+
+# get centroids of all municipalities
+# get pop. data for all centroids. 
+# classify them into binary more than 500 thousand and less.
+# run moving window
+
+
+
+
