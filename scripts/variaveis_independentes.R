@@ -102,8 +102,11 @@ prop_urb$prop_urb <- prop_urb$pop_urbana/prop_urb$pop_total
 
 write.csv(prop_urb,"tabelas_IbGE/CENSO_2010_pop_urbana.csv",row.names = F)
 
+
+# read_pop_arrangements ja traz a info de pop. urbana e rural! teria sido mais facil!
+
 # ------------------------------------------------------------------------------
-#  2.Proportion (%) of properties with more than 100 hectares
+#  2.Proportion (%) of properties with more than 100 hectares - ok
 # ------------------------------------------------------------------------------
 
 # funcao sem categoria
@@ -176,37 +179,98 @@ write.csv(prop_area,"tabelas_IbGE/IBGE_2017_prop_areaover100ha.csv",row.names = 
 #  3. Value of agricultural production (in thousands of reais) per hectare of planted area
 # ------------------------------------------------------------------------------
 
-# ja baixei em scripts separados, e ja esta rasterizado como valor/ha
+# ja baixei em scripts separados, e ja esta rasterizado como valor/ha - falta harmonizar resultados para reduzir outliers.
 
 # ------------------------------------------------------------------------------
-#  4. Value of agricultural subsidy/ha 
+#  4. Value of agricultural subsidy/ha (fiz por populacao!)
 # ------------------------------------------------------------------------------
 
-# tem um limite de ate 1milhao de linhas, q eu posso aumentar. pq nao vem dados completos
-# a área de custeio pode estar relacionada tanto aos recursos financeiros que serão utilizados para cobrir os gastos envolvidos na produção da safra OU a área que recebeu recursos. Dependendo do range de valores, da pra determinar se eh um ou outro. Como nao tem unidadade, se a ordem de grandeza dos valores de contrato e area de custeio forem diferentes, um eh $ e outro eh área. Se for similar, os 2 sao dinheiro.
-# filtro 2021
+# custeio, comercializacao, investimento
+# valor de custeio em: investimento, comercializacao, industrializacao. Talvez nem todos tenham area como algo importante, pq sao infra estrutura ou coisa q o valha.
 
 # aqui tem as operacoes possiveis em cada campo: https://olinda.bcb.gov.br/olinda/servico/ajuda
 
-URL <- "https://olinda.bcb.gov.br/olinda/servico/SICOR/versao/v2/odata/CusteioMunicipioProduto?$top=1000000&$filter=AnoEmissao%20eq%20'2021'&$format=text/csv&$select=Municipio,AnoEmissao,VlCusteio,Atividade,codIbge,AreaCusteio"
+# credito pra custeio, investimento, comecializaco e industrializacao!por municipio
+# tem atividade pecuaria e agricola. Talvez seja mais facil ponderar por outra coisa
 
-download.file(URL,destfile = "tabelas_IBGE/agri_subsidy.csv")
+getOption('timeout')
+options(timeout=120)
+
+URL <- "https://olinda.bcb.gov.br/olinda/servico/SICOR/versao/v2/odata/CusteioInvestimentoComercialIndustrialSemFiltros?$top=1000000&$filter=AnoEmissao%20eq%20'2021'&$format=text/csv&$select=Atividade,VlCusteio,VlInvestimento,VlComercializacao,VlIndustrializacao,codMunicIbge,AreaCusteio,AreaInvestimento"
+
+
+download.file(URL,destfile = "/dados/projetos_andamento/custo_oportunidade/BACEN/agri_subsidy_2.csv")
 
 library(readr)
-agri_subsidy <- read_csv("tabelas_IBGE/agri_subsidy.csv")
 
-# checando range valores vl custeio e area custeio
-summary(agri_subsidy_2021$VlCusteio/10^4)
-summary(as.numeric(gsub(pattern = ",",replacement = ".",x = agri_subsidy_2021$AreaCusteio))/10^4)# eh area!
+agri_subsidy <- read_csv("/dados/projetos_andamento/custo_oportunidade/BACEN/agri_subsidy_2.csv")
+
 
 # agregando dados
 
 agri_subsidy_agg <- agri_subsidy %>%
   mutate(AreaCusteio=as.numeric(gsub(pattern = ",",replacement = ".",x = AreaCusteio)))%>%
-  group_by_at(c(1,2,5))%>%
-  summarise(VlCusteio=sum(VlCusteio),AreaCusteio=sum(AreaCusteio))
+  mutate(AreaInvestimento=as.numeric(gsub(pattern = ",",replacement = ".",x = AreaInvestimento)))%>%
+  group_by_at(c(1,6))%>%
+  #summarise(VlCusteio=sum(VlCusteio),AreaCusteio=sum(AreaCusteio))
+  summarise_all(funs(sum))%>%
+  mutate(Atividade=if_else(Atividade==1,"agricola","pecuaria"))%>%
+  rowwise()%>%
+  mutate(Total_invest=sum(VlCusteio,VlInvestimento,VlComercializacao,VlIndustrializacao,n.rm=T))
 
-write.csv(agri_subsidy_agg,"tabelas_IBGE/Matriz_Cred_Rural_2021_agg.csv",row.names = F)
+write.csv(agri_subsidy_agg,"/dados/projetos_andamento/custo_oportunidade/BACEN/Matriz_Cred_Rural_2021_agg.csv",row.names = F)
+
+# get planted area and pasture area
+
+planted_area <- read.csv("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/PAM_IBGE_2021_rendimento_medio_ha.csv")
+
+
+total_planted <- planted_area %>%
+  group_by_at(c(5,6))%>%
+  summarise(planted_area_ha=sum(planted_area_ha,na.rm = T))%>%
+  rename_at(1, ~ 'code_muni')
+
+pasture_area <- read.csv("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/CENSO_2021_carne_rendimento_medio_ha.csv")
+
+names(pasture_area)[5] <- "code_muni"
+
+
+#combining subsidies with planted area
+# tem credito tb pra pecuaria, entao precisaria considerar tb!
+
+agri_subsidy_agg_Agri <- agri_subsidy_agg%>%
+  filter(Atividade=="agricola")%>%
+  left_join(total_planted,by=join_by(codMunicIbge==code_muni)) %>%
+  mutate(agri_subsidy_ha=Total_invest/planted_area_ha)
+
+agri_subsidy_agg_Past <- agri_subsidy_agg%>%
+  filter(Atividade=="pecuaria")%>%
+  left_join(pasture_area[,c(5,6,10)],by=join_by(codMunicIbge==code_muni)) %>%
+  mutate(agri_subsidy_ha=Total_invest/area_pastagem_ha)
+
+
+# oq fazer qndo da valores inf. como em locais q tem alto investimento mas praticamente nenhuma area pastagem? acho que eh melhor ponderar por outra coisa, q nao a area de pastagem ou agricultura. Como por ex, n propriedades, ou tamanho da populacao rural??
+
+# populacao me parece uma boa!!
+
+# ponderando pela populacao 
+
+pop <- read.csv("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/CENSO_2010_pop_urbana.csv")%>%
+  mutate(pop_rural = pop_total - pop_urbana)
+
+# agregando subsidio rural e adicionando populacao
+
+agri_subsidy_agg_pop <- agri_subsidy_agg%>%
+  group_by_at(2)%>%
+  summarise(Total_invest=sum(Total_invest))%>%
+  left_join(pop[,c(5,6,7,22)],by=join_by(codMunicIbge==Município..Código.)) %>%
+  mutate(agri_subsidy_pop_rural_2010=Total_invest/pop_rural)%>%
+  mutate(agri_subsidy_pop_total_2010=Total_invest/pop_total)
+  
+
+# aqui tem infos uteis:https://www.embrapa.br/geomatopiba/sistemas/credito-rural
+
+write.csv(agri_subsidy_agg_pop,"/dados/projetos_andamento/custo_oportunidade/BACEN/Cred_Rural_ponderado_populacao.csv",row.names = F)
 
 # ------------------------------------------------------------------------------
 #  5. Proportion (%) of the gross domestic product (GDP) in the agricultural sector in relation to total municipal GDP 
@@ -226,15 +290,11 @@ agricultural_gdp_df <- do.call(rbind,agricultural_gdp_data)
 
 write.csv(agricultural_gdp_df,"tabelas_IbGE/IBGE_2021_agricultural_GDP.csv",row.names = F)
 
-# nao entendo bem oq eh area de custeio e area de investimento na planilha.
-
-# agregar dados por total/municipio e dividir pela area plantada (IBGE)
-
 # ------------------------------------------------------------------------------
 #  6. Municipal GDP per capita (in thousands of reais) 
 # ------------------------------------------------------------------------------
 
-#...continuar
+#...continuar (jo vai fazer)
 
 #-------------------------------------------------------------------------------
 #  8. Distance (in 100 km) to the nearest municipality with more than 500 thousand inhabitants
