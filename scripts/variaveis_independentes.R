@@ -182,7 +182,7 @@ write.csv(prop_area,"tabelas_IbGE/IBGE_2017_prop_areaover100ha.csv",row.names = 
 # ja baixei em scripts separados, e ja esta rasterizado como valor/ha - falta harmonizar resultados para reduzir outliers.
 
 # ------------------------------------------------------------------------------
-#  4. Value of agricultural subsidy/ha (fiz por populacao!)
+#  4. Value of agricultural subsidy/ha (fiz por populacao!) - dicutir!
 # ------------------------------------------------------------------------------
 
 # custeio, comercializacao, investimento
