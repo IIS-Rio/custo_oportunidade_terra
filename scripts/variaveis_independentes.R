@@ -173,7 +173,7 @@ prop_area <- left_join(area_100_more,total)
 prop_area$Prop_area_over_100ha <- prop_area$total_area_100more/prop_area$total_area
 
 
-write.csv(prop_area,"tabelas_IbGE/IBGE_2017_prop_areaover100ha.csv",row.names = F)
+write.csv(prop_area,"tables_IBGE/IBGE_2017_prop_areaover100ha.csv",row.names = F)
 
 # ------------------------------------------------------------------------------
 #  3. Value of agricultural production (in thousands of reais) per hectare of planted area
