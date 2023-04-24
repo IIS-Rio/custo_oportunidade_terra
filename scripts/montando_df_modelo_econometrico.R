@@ -74,19 +74,50 @@ solo_pj <- projectRaster(solo,r,method = "bilinear")
 
 spatial_var[[6]] <- solo_pj
 
+# valor producao
+
 valor_prod <- raster("/dados/projetos_andamento/custo_oportunidade/raster_IBGE/rendimento_medio_ha_IBGE_agg_2021_smoothed.tif")
 
 spatial_var[[7]] <- valor_prod
 
-column_names <- c("DistCitiesover500k", "PropPast", "PropAgri","Relief","Climate","Soil",valor_prod)
+# proporcao vegetacao nativa tem q somar todos os usos nativos
+
+forest <- raster("/dados/projetos_andamento/custo_oportunidade/lu_mapbiomas_2020_1km/forest_1km.tif")
+
+wetland <- raster("/dados/projetos_andamento/custo_oportunidade/lu_mapbiomas_2020_1km/wetland_1km.tif")
+
+grassland <- raster("/dados/projetos_andamento/custo_oportunidade/lu_mapbiomas_2020_1km/grassland_1km.tif")
+
+otn <- raster("/dados/projetos_andamento/custo_oportunidade/lu_mapbiomas_2020_1km/otn_1km.tif")
+
+
+nat_veg <- forest + wetland + grassland + otn
+
+spatial_var[[8]] <- nat_veg
+
+
+
+column_names <- c("DistCitiesover500k", "PropPast", "PropAgri","Relief","Climate","Soil","valor_prod","Nat_Veg")
 
 for (i in seq_along(spatial_var)) {
   r_points[[column_names[i]]] <- extract(spatial_var[[i]], r_points)
 }
 
+# extraindo so pro nat veg, pq esqueci de fazer antes
+
+r_points$PropNatVeg <- extract(nat_veg, r_points)
+
 # adicionando x e y
 
 df_independent <- cbind(r_points@data,r_points@coords)
+
+# juntando com o df que ja existe (apagar depois)
+
+df_ind_full <- read.csv("/dados/projetos_andamento/custo_oportunidade/data_econometric_model/independent_variables.csv")
+
+
+# dar um join e salvar de novo - depois dar um join com o df completo tb!
+
 
 # grau urbanizacao (tabela)
 
@@ -148,3 +179,22 @@ head(df_noNA)
 
 write.csv(df_noNA,"/dados/projetos_andamento/custo_oportunidade/data_econometric_model/full_dataset_complete_cases.csv",row.names = F)
 
+# incluindo nat veg
+
+natveg <- read.csv("/dados/projetos_andamento/custo_oportunidade/data_econometric_model/PropNatVeg.csv")
+
+df_noNA <- read.csv("/dados/projetos_andamento/custo_oportunidade/data_econometric_model/full_dataset_complete_cases.csv")
+
+str(df_noNA)
+str(natveg)
+
+df_noNA$code_muni_IBGE <- as.character(df_noNA$code_muni_IBGE)
+natveg$code_muni_IBGE <- as.character(natveg$code_muni_IBGE)
+
+# I am not being able to merge or join! deve ser os NAs. Nao, tinha q usar o x e y, se nao eram mtas combinacoes!!
+
+
+
+df_noNA2 <- left_join(df_noNA,natveg[,c(3,4,5,6)])
+
+write.csv(df_noNA2,"/dados/projetos_andamento/custo_oportunidade/data_econometric_model/full_dataset_complete_cases.csv",row.names = F)

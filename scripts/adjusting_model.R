@@ -1,3 +1,11 @@
+#---- obs ----------------------------------------------------------------------
+
+# pensar em incluir % vegetacao nativa como preditora tb.
+# malha de estradas eh uma boa tb
+# relatorio instituto escolhas tem varias variaveis interessante tb!
+
+
+
 #---- pacotes ------------------------------------------------------------------
 
 # generalized mixed models
@@ -17,11 +25,14 @@ library(performance)
 library(ggeffects)
 library(purrr)
 library(ggcorrplot)
+library(sp)
 #-------------------------------------------------------------------------------
 
 # abrindo os dados
 
 df <- read.csv("/dados/projetos_andamento/custo_oportunidade/data_econometric_model/full_dataset_complete_cases.csv")
+
+df <- df[,-1]
 
 # adicionando codigo estado
 
@@ -38,7 +49,11 @@ df <- read.csv("/dados/projetos_andamento/custo_oportunidade/data_econometric_mo
 
 # Set the minimum number of data points per level
 
-min_data_points <- 100 # 100 pontos por municipio 
+min_data_points <- 50 # 100 pontos por municipio (testar varios pra ver oq muda - sensibilidae)
+
+# outros fators pra considerar eh ter dados representativos dos valores q eu quero modelar
+
+# So if you have 4 price bins, and you want to be able to predict them all well, then you might split your training data to have 25% of each price bin
 
 # Create a list of data frames, with one data frame for each group
 
@@ -82,9 +97,9 @@ hist(log(trainData$VTN_2022))
 
 df_sc <- trainData
 
-df_sc <- apply(df_sc[,c(3:8,11,12,13:16)],2,scale)
+df_sc <- apply(df_sc[,c(3:8,11,12,13:15,17)],2,scale)
 
-df_sc <- cbind(trainData[,c(1:2,9,10)],as.data.frame(df_sc))
+df_sc <- cbind(trainData[,c(1:2,9,10,16)],as.data.frame(df_sc))
 
 # fatorando codigo municipio
 
@@ -98,8 +113,9 @@ df_sc$VTN_2022_log <- log(df_sc$VTN_2022)
 
 # Create a scatterplot matrix
 ggcorrplot(df_sc[1:1000,c(3:8,11,12:15)], hc.order = TRUE, type = "lower")
+#
 
-cor_df <- cor(df_sc[,c(3:8,11,12:15)])
+cor_df <- cor(df_sc[,c(6:17)])
 
 
 ggcorrplot(cor_df, type = "lower", outline.color = "white")
@@ -121,16 +137,16 @@ ggcorrplot(cor_df, type = "lower", outline.color = "white")
 # 
 # names(sampled_df)
 
-f <- "VTN_2022 ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + (1|code_muni_IBGE)"
+f <- "VTN_2022 ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg +(1|code_muni_IBGE)"
 
-f_glm <- "VTN_2022 ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021"
+f_glm <- "VTN_2022 ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg"
 
-f_log <- "VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021+ (1|code_muni_IBGE)"
+f_log <- "VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021+ PropNatVeg + (1|code_muni_IBGE)"
 
-f_log_spatial <- "VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021"
+f_log_spatial <- "VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021+ PropNatVeg"
 
 # testing distributions
-
+#
 full_glm <- glm(f_glm,family= Gamma(link=log),sampled_df)
 
 full_gamma <- glmer(f,family =  Gamma(link=identity),
@@ -173,49 +189,89 @@ selecao_AIC <- model.sel(model_list)
 
 modelos_com_autocor <- list()
 
+# com n mto grande, o modelo nao converge! Mas tirando prop nat veg converge
 
-# modelo sem auto-correlacao pra comparar
+# modelo sem auto-correlacao pra comparar 
 
 modelos_com_autocor[[1]] <- lme(fixed = VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021, random=list(~1|code_muni_IBGE), data=df_sc)
 
+# atualizar o modelo, mudando parametros pra convergir
+
+modelos_com_autocor[[1]] <- update(modelos_com_autocor[[1]],. ~ . + PropNatVeg,control=lmeControl(singular.ok=TRUE, returnObject=TRUE))
+
+
 # modelo sem auto-correlacao exponencial
 
-modelos_com_autocor[[2]] <- lme(fixed = VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021, random=list(~1|code_muni_IBGE), correlation=corExp(form=~x+y),data=df_sc)
+
+modelos_com_autocor[[2]] <- update(modelos_com_autocor[[1]],correlation=corExp(form=~x+y))
+
+# modelos_com_autocor[[2]] <- lme(fixed = VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg, random=list(~1|code_muni_IBGE), correlation=corExp(form=~x+y),data=df_sc)
 
 # modelo com auto-correlacao esferica
 
-modelos_com_autocor[[3]] <- update(full_logN_spatial,correlation=corSpher(form=~x+y))
+modelos_com_autocor[[3]] <- update(modelos_com_autocor[[2]],correlation=corSpher(form=~x+y))
 
 # modelo com auto-correlacao gaussiana
 
-modelos_com_autocor[[4]] <- update(full_logN_spatial,correlation=corGaus(form=~x+y))
+modelos_com_autocor[[4]] <- update(modelos_com_autocor[[2]],correlation=corGaus(form=~x+y))
 
 # modelo com auto-correlacao razao
 
-modelos_com_autocor[[5]] <- update(full_logN_spatial,correlation=corRatio(form=~x+y))
+modelos_com_autocor[[5]] <- update(modelos_com_autocor[[2]],correlation=corRatio(form=~x+y))
 
 
 selecao_AIC_spatial <-model.sel(modelos_com_autocor)
 
-# o melhor foi o modelo sem auto-correlacao
+# o melhor foi o modelo sem auto-correlacao qndo tinha poucos dados. Mas, com um n largo o suficiente, o melhor eh o modelo com autocorrelacao exponencial
 # da pra fazer um buble plot de residuos vs coordenadas, se nao tiver tendencia, nao precisa levar em consideracao auto-correlacao espacial!
 # https://rdrr.io/cran/sp/man/bubble.html
+
+# example data:
+
+# temp_data = data.frame(error = rstandard(YF.glm), x = YFcases$x, y = YFcases$y)
+# coordinates(temp_data) <- c("x","y") 
+# bubble(temp_data, "error", col = c("black","grey"),
+#        main = "Residuals", xlab = "X-coordinates", ylab = "Y-coordinates")
+
+temp_data <- data.frame(error=residuals(modelos_com_autocor[[1]]),x=df_sc$x,y=df_sc$y)
+
+coordinates(temp_data) <- c("x","y")
+
+bubble(temp_data, "error", col = c("black","grey"),
+      main = "Residuals", xlab = "X-coordinates", ylab = "Y-coordinates")
+
+# o padrao eh estranho. acho q vale a pena rodar o dredge, e ai comparar com e sem so desse melhor.
 
 model_list_spatial <- dredge(modelos_com_autocor[[1]] )
 
 melhores_spatial <- model.sel(model_list_spatial)
 
 # seleciona todos com valor menor ou igual ao limite de AIC
+
 best_models <- get.models(melhores_spatial,subset=delta <= 2 )
 
 
 
-f_best_model <- "VTN_2022_log ~ Climate + DistCitiesover500k + Prop_area_over_100ha +      prop_urb + PropAgri + PropAgriGDP + PropPast + Soil + valor_prod_IBGE_2021" # plus the random part!
+f_best_model <- "VTN_2022_log ~ Climate + DistCitiesover500k + Prop_area_over_100ha +      prop_urb + PropAgri + PropAgriGDP +PropNatVeg+ PropPast + Relief +  Soil + valor_prod_IBGE_2021" # plus the random part!
 
 summary(best_model[[1]])
 
-r.squaredLR(best_model[[1]])
-r2_nakagawa(best_model[[1]])
+r.squaredLR(best_models[[1]])
+r2_nakagawa(best_models[[1]])
+
+# testar com autocor
+
+best_models_spatialcor <- update(best_models[[1]],correlation=corExp(form=~x+y))
+
+with_without_spatial_best_model <- model.sel(best_models[[1]],best_models_spatialcor)
+
+
+r2_nakagawa(modelos_com_autocor[[2]])
+r.squaredLR(modelos_com_autocor[[2]])
+
+r2_nakagawa(best_models_spatialcor)
+
+# tem algo estranho, a diferenca entre com e sem spatialta dando mto grande!
 
 
 # plotar
@@ -249,9 +305,14 @@ library(randomForest)
 library(caret)
 ?randomForest
 
-rfModel <- randomForest(formula=VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021, data=df_sc, ntree=500)
+rfModel <- randomForest(formula=VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg, data=df_sc, ntree=500)
 
-actual <- sampled_df$VTN_2022
-predicted <- unname(predict(rfModel, sampled_df))
+actual <- log(testData$VTN_2022)
+predicted <- unname(predict(rfModel, testData))
 
-caret::R2(pred = predicted,obs = actual)# deu um pouco maior!
+
+caret::R2(pred = predicted,obs = actual)# deu mto parecido! #0.39
+# o rs fica parecido com r marginal do modelo misto!
+# desse jeito fica valendo a pena esse modelo!
+# tem q aumentar!!
+summary(rfModel)
