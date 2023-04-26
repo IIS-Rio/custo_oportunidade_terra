@@ -18,7 +18,6 @@ library(brms)
 library(MuMIn)
 library(spdep)
 library(sf)
-install.packages('DHARMa', dependencies=TRUE, type="source")
 library(dharma)
 library(nlme)
 library(performance)
@@ -33,19 +32,6 @@ library(sp)
 df <- read.csv("/dados/projetos_andamento/custo_oportunidade/data_econometric_model/full_dataset_complete_cases.csv")
 
 df <- df[,-1]
-
-# adicionando codigo estado
-
-# library(geobr)
-# UF <-read_municipality(year = "2020") 
-# 
-# st_geometry(UF) <- NULL
-# 
-# df_UF <- left_join(df,UF[,c(1,4)],join_by(code_muni_IBGE==code_muni))
-# 
-# write.csv(df_UF,"/dados/projetos_andamento/custo_oportunidade/data_econometric_model/full_dataset_complete_cases.csv")
-# separando os dados em training e testing
-# acho que vale gerar um training menor, e com dados de todos os estado!
 
 # Set the minimum number of data points per level
 
@@ -92,6 +78,12 @@ hist(trainData$VTN_2022)  # tem uma distribuicao mega desigual, acho que gamma e
 
 hist(log(trainData$VTN_2022))
 
+dist <- trainData%>%
+  mutate(VTN_2022=log(VTN_2022))%>%
+  gghistogram(x=("VTN_2022"),xlab = "log(VTN)")
+
+
+ggsave("/dados/pessoal/francisco/custo_oportunidade_terra/figures/distribution.jpg",plot = dist,width = 16,height = 16,units = "cm")
 
 # escalar todas as variaveis preditoras
 
@@ -117,8 +109,37 @@ ggcorrplot(df_sc[1:1000,c(3:8,11,12:15)], hc.order = TRUE, type = "lower")
 
 cor_df <- cor(df_sc[,c(6:17)])
 
+library(GGally)
 
-ggcorrplot(cor_df, type = "lower", outline.color = "white")
+# check relation between variables, sampling a smaller dataset
+
+set.seed(123) # for reproducibility
+df_sc_sampled <- df_sc[sample(nrow(df_sc), 50000), ]
+
+
+# Subset the data to include only the independent variables and the response variable
+df_sub <- df_sc_sampled[,c(1,6:17)]
+
+# Reshape the data to long format
+melted_data <- melt(df_sub, id.vars = "VTN_2022", variable.name = "Variable", value.name = "Value")
+
+# Create the scatterplot matrix using ggplot2 and facet_wrap
+scater <- ggplot(melted_data, aes(x = Value, y = VTN_2022,col="purple")) +
+  geom_point(alpha = 0.1) +
+  facet_wrap(~ Variable, scales = "free") +
+  labs(x = "Value", y = "VTN_2022") +
+  theme_classic()+
+  scale_y_continuous(labels = comma)+
+  theme(legend.position = "none")
+
+
+plot_correlacao <- ggcorrplot(cor_df, type = "lower", outline.color = "white")
+
+ggsave("/dados/pessoal/francisco/custo_oportunidade_terra/figures/corrplot.jpg",plot = plot_correlacao,width = 16,height = 16,units = "cm")
+
+
+ggsave("/dados/pessoal/francisco/custo_oportunidade_terra/figures/resposta_vs_preditoras_scater.jpg",plot =scater,width = 25,height = 20,units = "cm")
+
 
 # tem varias q tem alta correlacao. preciso definir modelos a partir disso!
 
@@ -226,13 +247,6 @@ selecao_AIC_spatial <-model.sel(modelos_com_autocor)
 # da pra fazer um buble plot de residuos vs coordenadas, se nao tiver tendencia, nao precisa levar em consideracao auto-correlacao espacial!
 # https://rdrr.io/cran/sp/man/bubble.html
 
-# example data:
-
-# temp_data = data.frame(error = rstandard(YF.glm), x = YFcases$x, y = YFcases$y)
-# coordinates(temp_data) <- c("x","y") 
-# bubble(temp_data, "error", col = c("black","grey"),
-#        main = "Residuals", xlab = "X-coordinates", ylab = "Y-coordinates")
-
 temp_data <- data.frame(error=residuals(modelos_com_autocor[[1]]),x=df_sc$x,y=df_sc$y)
 
 coordinates(temp_data) <- c("x","y")
@@ -265,37 +279,107 @@ best_models_spatialcor <- update(best_models[[1]],correlation=corExp(form=~x+y))
 
 with_without_spatial_best_model <- model.sel(best_models[[1]],best_models_spatialcor)
 
-
-r2_nakagawa(modelos_com_autocor[[2]])
-r.squaredLR(modelos_com_autocor[[2]])
-
-r2_nakagawa(best_models_spatialcor)
-
 # tem algo estranho, a diferenca entre com e sem spatialta dando mto grande!
 
+r2_nakagawa(best_models[[1]])
+r2_nakagawa(best_models_spatialcor)
+
+# testar incluir estado no model
+
+modelo_aninhado <- update(best_models[[1]],random=list(~1|code_muni_IBGE,~1|abbrev_state))
+
+# overfitted/unstable model. tentar incluir como fator randomico separado!
+# aninhado nao funcionou, entao adicionei como 2 fatores randomicos
+
+AIC(best_models[[1]],modelo_aninhado)
+
+# melhor desconsiderar estado
+
+check_df <- as.data.frame(table(df_sc$code_muni_IBGE,df_sc$abbrev_state))%>%
+  filter(Freq!=0)
 
 # plotar
 
 library(ggeffects)
 library(ggpubr)
 
-lista_graficos <- plot(ggpredict(best_model[[1]]))
+mod_to_plot <- best_models[[1]] # or
+mod_to_plot <- best_models_spatialcor
+
+lista_graficos <- plot(ggpredict(best_models[[1]]))
 
 # plotando na escala normal
-
+lista_graficos2 <- list()
 for(i in 1:length(lista_graficos)){
 
   lista_graficos[[i]]$data$predicted <- exp(lista_graficos[[i]]$data$predicted)
 
   lista_graficos[[i]]$data$conf.low <- exp(lista_graficos[[i]]$data$conf.low)
   lista_graficos[[i]]$data$conf.high <- exp(lista_graficos[[i]]$data$conf.high)
-
+  
+  #lista_graficos2[[i]]<- ggpar(lista_graficos[[i]],title = "")
 }
 
 # depois olhar melhor como plotar!
-ggarrange(plotlist =lista_graficos[1:9])
+
+var_individuais <- ggarrange(plotlist =lista_graficos[1:9])
+
+ggsave("figures/predicted_values_glmm.jpg",var_individuais,width = 28,height = 15,units = "cm")
 
 # falta aumentar o n amostral e testar o poder de previsao do modelo e tb pensar em modelos mais complexos, nao necessariamente lineares!!
+
+# algumas variaveis, plotadas sozinhas, tem comportamento bem louco.
+
+summary(best_models[[1]])
+
+terms <- c("Climate" ,"DistCitiesover500k" , "Prop_area_over_100ha" ,  "prop_urb","PropAgri" , "PropAgriGDP" , "PropNatVeg" , "PropPast",      "Relief" , "Soil" , "valor_prod_IBGE_2021")
+
+
+# Extract coefficients and confidence intervals
+
+coef <- data.frame(fixef(best_models_spatialcor))
+
+names <- names(fixef(best_models_spatialcor))
+
+coef_df <-cbind( data.frame(term = names),intervals$fixed)
+
+intervals <- intervals(best_models_spatialcor)
+
+effect_size_plot <- coef_df%>%
+  filter(term!="(Intercept)")%>%
+  ggplot(aes(x=term,y = est.))+
+    #geom_point(size = 0.05) +
+    geom_pointrange(aes(ymin=lower,ymax=upper), size=0.2) + 
+    coord_flip()+
+    geom_hline(yintercept = 0, linetype="dotted",color = "black", linewidth=0.5) 
+    
+
+ggsave("figures/effect_size_best_model.jpg",plot = effect_size_plot,width = 20,height = 16,units = "cm")
+
+
+# ta estranho alguns parametros sao ultra pequenos o erro. suspeito que o modelo nao esteja bem ajustado.
+
+# ploting residuals
+
+# Create residual plot
+
+residuos <- plot(best_models_spatialcor)
+
+library(DHARMa)
+
+# residuos do modelo sem componente espacial:
+# nao finciona com nlme, testar com lme4 sem auto-correlacao espacial
+simulationOutput <- simulateResiduals(fittedModel = best_models[[1]], plot = F)
+
+plot(simulationOutput)
+
+
+# cross validation
+
+actual <- log(testData$VTN_2022)
+predicted <- unname(predict(best_models_spatialcor, testData))
+
+caret::R2(pred = predicted,obs = actual)# 0.37
 
 ################################################################################
 ## machine learning
@@ -303,7 +387,7 @@ ggarrange(plotlist =lista_graficos[1:9])
 
 library(randomForest)
 library(caret)
-?randomForest
+library(RANN)
 
 rfModel <- randomForest(formula=VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg, data=df_sc, ntree=500)
 
@@ -312,7 +396,105 @@ predicted <- unname(predict(rfModel, testData))
 
 
 caret::R2(pred = predicted,obs = actual)# deu mto parecido! #0.39
+RMSE(predicted,actual)
+
 # o rs fica parecido com r marginal do modelo misto!
 # desse jeito fica valendo a pena esse modelo!
 # tem q aumentar!!
 summary(rfModel)
+plot(rfModel)
+# o plato ta em 300, daria pra diminuir numero de trees
+# random forest demora bem mais pra rodar
+plot(predicted, resid(rfModel))
+
+# ta parecido
+
+# Get the predictor variable names
+predictor_names <- names(df_sc)[1:ncol(df_sc)-1][6:17]
+
+# Create a data frame with the predictor variables
+predictors <- testData[,predictor_names]
+
+# scale them
+
+predictors_sc <-as.data.frame( apply(predictors, 2, scale))
+
+# Add the predictions to the data frame
+
+predictors_sc$predictions <- predict(rfModel, newdata = predictors_sc)
+
+# Melt the data frame for use with ggplot2
+melted_predictors <- reshape2::melt(predictors_sc, id.vars = "predictions")
+  
+melted_predictors$predictions_unlog <- exp(melted_predictors$predictions)
+
+
+# Generate a panel of scatterplots with curve and confidence interval
+painel_RF <- ggplot(melted_predictors, aes(x = value, y = predictions_unlog)) +
+  geom_point(alpha = 0.01,col="blue") +
+  #ylim(0,60000)+
+  facet_wrap(~variable, scales = "free") +
+  labs(x = "Predictor Variable", y = "Predicted VTN") +
+  stat_smooth(method = "lm", se = TRUE, fullrange = TRUE,formula = y ~ x,color="red")+
+  scale_x_continuous(limits = function(x) c(min(x), max(x)))+
+  scale_y_continuous(limits = function(y) c(min(y), max(y)))+
+  ylim(0,50000)+
+  theme_classic()
+
+
+ggsave("figures/predicted_values_randomForest.jpg",painel_RF,width = 28,height = 15,units = "cm")
+
+
+# Get the variable importance
+var_imp <- importance(rfModel)
+
+# Create a data frame with the variable importance
+var_imp_df <- data.frame(variable = rownames(var_imp),
+                         importance = var_imp[,"IncNodePurity"])
+
+# Sort the data frame by importance
+var_imp_df <- var_imp_df[order(var_imp_df$importance, decreasing = TRUE),]
+
+# Create a bar plot of the variable importance
+importance <- var_imp_df %>%
+  arrange(desc(importance))%>%
+  ggplot( aes(x = reorder(variable, +importance), y = importance)) +
+    geom_bar(stat = "identity", fill = "dodgerblue") +
+    coord_flip() +
+    labs(x = "Variable", y = "Importance") +
+    theme_minimal()
+
+ggsave("figures/variables_importance.jpg",importance,width = 20,height = 15,units = "cm")
+
+# testanto random forest com spatiall weights
+
+library(spatialRF)
+library(spdep)
+library(gstat)
+library(fields)
+
+# Calculate distance matrix
+coords <- as.matrix(trainData[, c("x", "y")])
+
+#spdf <- SpatialPointsDataFrame(coords = coords, data = df_sc)
+
+# Compute distance matrix using nn2() esse eh rapido
+# nn <- nn2(coords)
+# d <- matrix(nn$nn.dists, nrow = nrow(df_sc))
+
+
+# Calculate Euclidean distance matrix
+d <- rdist(coords) # isso gera raster de 86 gb!
+# talvez valha a pena considerar usar apenas x e y como coordenadas!
+
+predictor.variable.names <- colnames(df_sc)[6:17]
+dependent.variable.name <- "VTN_2022_log"
+# da pra fazer multi core
+rfModel_sp <- rf_spatial(data=df_sc,dependent.variable.name = dependent.variable.name,predictor.variable.names =predictor.variable.names[11] , distance.matrix = d,n.cores = 1)
+
+
+
+################################################################################
+
+# se formos ficar com estimacao por verossimilhanca, talvez valha a pena migrar pra bayes.
+

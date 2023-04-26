@@ -256,9 +256,3 @@ plot(log(lavoura_r))
 raster::writeRaster(lavoura_r,"/dados/pessoal/francisco/custo_oportunidade_terra/raster_IBGE/rendimento_medio_ha_lavoura_ponderada_IBGE_2021.tif")
 
 
-
-
-IBGE <- raster("/dados/pessoal/francisco/custo_oportunidade_terra/raster_IBGE/rendimento_medio_ha_IBGE_agg_2021.tif")
-
-plot(IBGE)
-summary(IBGE[])
