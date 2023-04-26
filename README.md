@@ -9,7 +9,7 @@ Produção de uma camada de custo de oportunidade da terra pro Brasil.
   - O script 1 baixa os dados da PAM para lavoura temporária e permanente e gera um raster com a mesma resolução do raster de uso do solo, contendo rendimento médio lavoura/ha.
   
 - Produção pecuária
- - O script 2 usa valor de producao de carnes da PAM + a área pastagem do censo rural para gerar um raster com rendimento médio pecuária/ha
+  - O script 2 usa valor de producao de carnes da PAM + a área pastagem do censo rural para gerar um raster com rendimento médio pecuária/ha
  
  - Dados de producao silvicultura
   - O scritp 3 usa os valores de producao e area plantada de silvicultura da PAM para gerar um raster com rendimento médio/ha.
@@ -21,12 +21,12 @@ Produção de uma camada de custo de oportunidade da terra pro Brasil.
 
 ## Valor da terra
 
-Os dados de valor da terra são provenientes dos dados de Valor da terra nua (VTN)disponibilizados pela Receita Federal
+- Os dados de valor da terra são provenientes dos dados de Valor da terra nua (VTN)disponibilizados pela Receita Federal
 
-- O script 6 baixa os dados do site da receita, salva em pdf e transforma os pdfs em arquicos .csv
-- O script 7 substitui valores de VTN com NA por valores plausiveis
-- O script 8 pode ser rodado como background job e cruza os valores de VTN com os usos do solo, já considerando aptidão agrícola por ex, para gerar rasters de VTN para cada tipo de uso (agricultura, pastagem, vegetação nativa)
-- O script 9 junta os rasters de VTN num raster unico.
+  - O script 6 baixa os dados do site da receita, salva em pdf e transforma os pdfs em arquicos .csv
+  - O script 7 substitui valores de VTN com NA por valores plausiveis
+  - O script 8 pode ser rodado como background job e cruza os valores de VTN com os usos do solo, já considerando aptidão agrícola por ex, para gerar rasters de VTN para cada tipo de uso (agricultura, pastagem, vegetação nativa)
+  - O script 9 junta os rasters de VTN num raster unico.
 
 ## Produção agropecuária x Uso da terra
 
