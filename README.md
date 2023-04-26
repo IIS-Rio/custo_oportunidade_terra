@@ -11,7 +11,7 @@ Produção de uma camada de custo de oportunidade da terra pro Brasil.
 - Produção pecuária
   - O script 2 usa valor de producao de carnes da PAM + a área pastagem do censo rural para gerar um raster com rendimento médio pecuária/ha
  
- - Dados de producao silvicultura
+- Dados de producao silvicultura
   - O scritp 3 usa os valores de producao e area plantada de silvicultura da PAM para gerar um raster com rendimento médio/ha.
   
 ## Aptidão agrícola 
