@@ -25,6 +25,9 @@ library(ggeffects)
 library(purrr)
 library(ggcorrplot)
 library(sp)
+library(tidyr)
+library(purrr)
+library(randomForest)
 #-------------------------------------------------------------------------------
 
 # abrindo os dados
@@ -63,8 +66,6 @@ sampled_df_list <- df_list %>% map(~ sample_df(.x, min_data_points))
 sampled_df <- sampled_df_list %>% bind_rows()
 
 # definir o df que vai ser usado pro training etc. por enquanto, a amostragem!
-
-
 
 trainIndex <- sample(1:nrow(sampled_df), 0.7*nrow(sampled_df))
 trainData <- sampled_df[trainIndex, ]
@@ -385,11 +386,13 @@ caret::R2(pred = predicted,obs = actual)# 0.37
 ## machine learning
 ################################################################################
 
+# talvez valha a pena pelo grande numero de variaveis preditoras que temos
+
 library(randomForest)
 library(caret)
 library(RANN)
 
-rfModel <- randomForest(formula=VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg, data=df_sc, ntree=500)
+rfModel <- randomForest(formula=VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg, data=df_sc, ntree=100)
 
 actual <- log(testData$VTN_2022)
 predicted <- unname(predict(rfModel, testData))
@@ -445,6 +448,28 @@ painel_RF <- ggplot(melted_predictors, aes(x = value, y = predictions_unlog)) +
 ggsave("figures/predicted_values_randomForest.jpg",painel_RF,width = 28,height = 15,units = "cm")
 
 
+# plotando com ggRandomForest
+
+library(ggRandomForests)
+
+
+gg_data <- gg_variable(rfModel)
+gg_data$yhat <- exp(gg_data$yhat)
+names(df_sc)
+
+# panels
+#plot(gg_dta,xvar=c("disp","hp", "drat", "wt", "qsec"),  panel=TRUE)
+
+plot(gg_data, xvar=c("PropNatVeg"),alpha=0.1)
+  
+pane_RF <- plot(gg_data, xvar=c(names(df_sc)[6:17]), alpha=0.05, panel=TRUE)+
+   theme_classic()
+ 
+
+ggsave("figures/predicted_values_randomForest.jpg",pane_RF,width = 28,height = 15,units = "cm")
+
+randomForest::varImpPlot(rfModel)
+
 # Get the variable importance
 var_imp <- importance(rfModel)
 
@@ -466,13 +491,15 @@ importance <- var_imp_df %>%
 
 ggsave("figures/variables_importance.jpg",importance,width = 20,height = 15,units = "cm")
 
-# testanto random forest com spatiall weights
+# testanto random forest com spatiall weights ----------------------------------
 
 library(spatialRF)
 library(spdep)
 library(gstat)
 library(fields)
+library(LongituRF)
 
+# checar esse: https://blasbenito.github.io/spatialRF/
 # Calculate distance matrix
 coords <- as.matrix(trainData[, c("x", "y")])
 
@@ -492,7 +519,174 @@ dependent.variable.name <- "VTN_2022_log"
 # da pra fazer multi core
 rfModel_sp <- rf_spatial(data=df_sc,dependent.variable.name = dependent.variable.name,predictor.variable.names =predictor.variable.names[11] , distance.matrix = d,n.cores = 1)
 
+# tentar apenas incluir como co-variavel
 
+# Generate distance matrix using inverse distance weighting
+coords <- as.matrix(trainData[, c("x", "y")])
+d <- idw.spatial.weights(coords, idp = 2, style = "W")
+
+#---- random forest com niveis hierarquicos ------------------------------------
+
+library(MixRF)
+?MERT
+
+# testar antes com df menor, depois implementar processamento em paralelo
+
+df_sub <-df_sc %>% sample_n(1000)
+
+factor("3132602", levels = levels(df_sub$code_muni_IBGE))
+
+class(df_sub$code_muni_IBGE)
+
+tmp = MixRF(Y = df_sub$VTN_2022_log,X = df_sub[,6:17],random ="(1|code_muni_IBGE)",data=df_sub,initialRandomEffects = 0,ErrorTolerance = 1e-4,MaxIterations = 100 )
+
+summary(tmp)
+test_sub <- testData %>% sample_n(1000)
+test_sub$code_muni_IBGE <-  "3524204"
+
+actual <- log(df_sub$VTN_2022)
+predicted <- predict(tmp$forest, test_sub)
+
+caret::R2(pred = predicted,obs = actual)
+RMSE(predicted,actual)
+
+# Define the parallel backend
+cl <- makeCluster(detectCores())
+
+# Define the mixRF function with parallel processing
+mixRF_par <- function(formula, data, mtry, ntree) {
+  mixRF_fit <- mixRF(formula = formula, data = data, mtry = mtry, ntree = ntree, 
+                     write.output = FALSE)
+  return(mixRF_fit)
+}
+
+
+#---- descartando variaveis de pouca importancia -------------------------------
+
+# aqui vale usar apenas variaveis de alta importancia
+# paralelizar o modelo
+# reduzir numero de trees!
+# adicionar x e y como covariaveis!!
+
+library(randomForest)
+library(doParallel)
+library(foreach)
+
+# Define the number of CPU cores to use
+n_cores <- 10
+
+# Initialize the parallel backend
+cl <- makeCluster(n_cores)
+registerDoParallel(cl)
+
+# Define the formula and data for the random forest model
+formula <- VTN_2022_log ~ DistCitiesover500k +  PropAgri +  Climate +   valor_prod_IBGE_2021 + PropNatVeg + x + y
+
+# adding x_y variable
+
+# Fit the random forest model using the parallel backend
+rfModel <- foreach(ntree = rep(100, n_cores), .combine = combine, .multicombine=TRUE,.packages = "randomForest") %dopar% {
+  randomForest(formula = formula, data = data,importance=TRUE, ntree = ntree)
+}
+
+
+# Stop the parallel backend
+stopCluster(cl)
+
+# Combine the individual forest objects
+rfModelCombined <- randomForest::combine (rfModel)
+
+class(rfModelCombined )
+rfModelCombined$terms
+
+
+randomForest::varImpPlot(rfModel)
+
+actual <- log(testData$VTN_2022)
+predicted <- predict(rfModel, testData)
+
+caret::R2(pred = predicted,obs = actual) # incluir y melhorou mto modelo
+RMSE(predicted,actual)
+
+plot(predicted, resid(rfModel)) # tem um padrao horrivel
+
+# isso aqui nao funciona qndo roda via paralelizacao, p:
+
+gg_data <- gg_variable(rfModel[[1]]$data)
+
+plot(gg_data, xvar=c("yhat"),alpha=0.1)
+
+class(rfModel)
+
+rfModel[[1]]
+rfModel[[2]]
+
+
+gg_data$yhat <- exp(gg_data$yhat)
+
+gg_data <- cbind(gg_data,df_sc)
+
+pane_RF <- plot(gg_data, xvar=c("DistCitiesover500k","PropAgri","Climate","valor_prod_IBGE_2021","PropNatVeg"), alpha=0.05, panel=TRUE)+
+  theme_classic()
+
+
+# o de cima funciona mas fica estranho o objeto. Tentar abaixo, ou nem paralelizar
+
+cl<-makePSOCKcluster(10)
+
+registerDoParallel(cl)
+
+start.time<-proc.time()
+
+model<-train(formula, data=data, method='rf')
+stop.time<-proc.time()
+
+run.time<-stop.time -start.time
+
+print(run.time)
+
+stopCluster(cl)
+
+actual <- log(testData$VTN_2022)
+predicted <- predict(model, testData)
+
+caret::R2(pred = predicted,obs = actual)
+
+summary(model)
+
+
+# esse pacote aqui parece promissor pra rodar rapido
+
+# https://www.randomforestsrc.org/articles/speedup.html
+
+data <- df_sc
+library(randomForestSRC)
+library(doParallel)
+library(ggRandomForests)
+
+# Define the formula and data for the random forest model
+formula <- VTN_2022_log ~ DistCitiesover500k +  PropAgri +  Climate +   valor_prod_IBGE_2021 + PropNatVeg + x + y
+
+
+rfModel <- rfsrc.fast(formula = formula, data = df_sc, ntree = 100,splitrule = "random",forest=TRUE)
+
+actual <- log(testData$VTN_2022)
+predicted <- randomForestSRC::predict.rfsrc(object = rfModel, newdata = testData[,-1])
+
+caret::R2(pred = predicted$predicted
+,obs = actual)
+
+caret::RMSE(predicted$predicted,actual)
+
+x <- gg_variable(rfModel)
+x$yhat <- exp(x$yhat)
+head(x)
+
+pane_RF <- plot(x, xvar=c("DistCitiesover500k" , "PropAgri" , "Climate" ,   "valor_prod_IBGE_2021", "PropNatVeg"), alpha=0.05, panel=TRUE)+
+  theme_classic()
+
+
+ggsave("figures/predicted_values_randomForest_simplified.jpg",pane_RF,width = 28,height = 15,units = "cm")
 
 ################################################################################
 
