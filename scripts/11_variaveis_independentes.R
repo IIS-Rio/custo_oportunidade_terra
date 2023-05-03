@@ -294,7 +294,22 @@ write.csv(agricultural_gdp_df,"tabelas_IbGE/IBGE_2021_agricultural_GDP.csv",row.
 #  6. Municipal GDP per capita (in thousands of reais) 
 # ------------------------------------------------------------------------------
 
-#...continuar (jo vai fazer)
+# jo ja fez
+
+#-------------------------------------------------------------------------------
+# 7. Proportion (%) of landowners in relation to total agricultural producers
+#-------------------------------------------------------------------------------
+
+tabela <- 6778
+# variavel <- 93
+# classificacao <- c("c1") 
+# geo <- "City"
+# category  <-  list(0,1)# 0=total,1=urbana
+# period="2010"
+
+info_sidra(tabela)
+
+
 
 #-------------------------------------------------------------------------------
 #  8. Distance (in 100 km) to the nearest municipality with more than 500 thousand inhabitants
