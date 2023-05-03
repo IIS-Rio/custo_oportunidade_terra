@@ -300,16 +300,30 @@ write.csv(agricultural_gdp_df,"tabelas_IbGE/IBGE_2021_agricultural_GDP.csv",row.
 # 7. Proportion (%) of landowners in relation to total agricultural producers
 #-------------------------------------------------------------------------------
 
-tabela <- 6778
-# variavel <- 93
-# classificacao <- c("c1") 
-# geo <- "City"
-# category  <-  list(0,1)# 0=total,1=urbana
-# period="2010"
+tabela <- 6779
+variavel <- 183
+classificacao <- c("c218") #c218
+geo <- "City"
+category  <-  list(46502,46503)# 0=total,1=urbana
 
 info_sidra(tabela)
+proporcao_proprietarios_list <- list()
+for(cat in 1:length(category)){
+  proporcao_proprietarios <- lapply(mun_code,f,tabela=tabela,classific=classificacao,variavel=variavel,period="2017",category=list(category[[cat]]))
+  proporcao_proprietarios_list[[cat]] <- proporcao_proprietarios
+
+  }
+
+proporcao_proprietarios_total <- do.call(rbind,proporcao_proprietarios_list[[1]])
+proporcao_proprietarios_prop <- do.call(rbind,proporcao_proprietarios_list[[2]])
+
+names(proporcao_proprietarios_prop)[c(5)] <- "sao_proprietarios"
+
+proporcao_proprietarios_join <- left_join(proporcao_proprietarios_total,proporcao_proprietarios_prop[,c(5,6)])%>%
+  mutate(prop_proprietarios=sao_proprietarios/Valor)
 
 
+write.csv(proporcao_proprietarios_join,"tabelas_IBGE/IBGE_censo_agricola_2017_prop_sao_proprietarios.csv",row.names = F)
 
 #-------------------------------------------------------------------------------
 #  8. Distance (in 100 km) to the nearest municipality with more than 500 thousand inhabitants
@@ -413,3 +427,132 @@ plot(distance_raster_km_m)
 
 
 writeRaster(distance_raster_km_m,"/dados/projetos_andamento/custo_oportunidade/raster_IBGE/distance_Cities_over_500k.tif")
+
+#-------------------------------------------------------------------------------
+#  9. n tratores
+#-------------------------------------------------------------------------------
+
+tabela <- 6872
+variavel <- 9572
+classificacao <- c("c796")
+ geo <- "City"
+category  <-  list(46567)
+period="2017"
+info_sidra(tabela)
+
+n_maquinario <- lapply(mun_code,f,tabela=tabela,classificacao=classificacao,variavel=variavel,period=period,category=category)
+  
+n_maquinario_df <- do.call(rbind,n_maquinario)
+head(n_maquinario_df)
+
+write.csv(n_maquinario_df,"tabelas_IBGE/IBGE_censo_agricola_2017_n_maquinario.csv",row.names = F)
+
+#-------------------------------------------------------------------------------
+#  10. n pessoas empregadas em estabelecimentos agropecuarios
+#-------------------------------------------------------------------------------
+
+tabela <- 6884
+variavel <- 185
+classificacao <- c("c829")
+geo <- "City"
+category  <-  list(46302)
+period="2017"
+info_sidra(tabela)
+
+n_empregados <- lapply(mun_code,f,tabela=tabela,classificacao=classificacao,variavel=variavel,period=period,category=category)
+
+n_empregados_df <- do.call(rbind,n_empregados)
+
+head(n_empregados_df)
+
+write.csv(n_empregados_df,"tabelas_IBGE/IBGE_censo_agricola_2017_n_empregados.csv",row.names = F)
+
+#-------------------------------------------------------------------------------
+# 11. capacidade armazenamento (toneladas)
+#-------------------------------------------------------------------------------
+
+tabela <- 6866
+variavel <- 9561
+classificacao <- c("c829")
+geo <- "City"
+category  <-  list(46302)
+period="2017"
+info_sidra(tabela)
+
+armazenamento <- lapply(mun_code,f,tabela=tabela,classificacao=classificacao,variavel=variavel,period=period,category=category)
+
+armazenamento_df <- do.call(rbind,armazenamento)
+head(armazenamento_df)
+
+write.csv(armazenamento_df,"tabelas_IBGE/IBGE_censo_agricola_2017_armazenamento_dfs.csv",row.names = F)
+
+#-------------------------------------------------------------------------------
+# 12. Proporcao estabalecimentos com energia
+#-------------------------------------------------------------------------------
+
+tabela <- 6778
+variavel <- 183
+classificacao <- c("c309")
+geo <- "City"
+category  <-  list(10969,3011)
+period="2017"
+info_sidra(tabela)
+
+prop_energia_list <- list()
+#prop_energia_calculado <- list()
+  for(i in 1:length(category)){
+  prop_energia <- lapply(mun_code,f,tabela=tabela,classificacao=classificacao,variavel=variavel,period=period,category=list(category[[i]]))
+  prop_energia_list[[i]] <- prop_energia
+}
+
+# melhor rodar separado. Ou fazer o join dentro do loop!
+prop_energia_df_total <- do.call(rbind,prop_energia_list[[1]])
+prop_energia_df_luz <- do.call(rbind,prop_energia_list[[2]])
+names(prop_energia_df_luz)[c(5)] <- "tinham_energia"
+
+prop_energia_df_join <- left_join(prop_energia_df_total,prop_energia_df_luz[,c(5,6)])%>%
+  mutate(prop_com_energia=tinham_energia/Valor)
+
+
+write.csv(prop_energia_df_join,"tabelas_IBGE/IBGE_censo_agricola_2017_prop_com_energia.csv",row.names = F)
+
+
+#-------------------------------------------------------------------------------
+# 13. grau escolaridade
+#-------------------------------------------------------------------------------
+
+tabela <- 6779
+variavel <- 183
+classificacao <- c("c800")
+geo <- "City"
+category  <-  list(41147,40729) #41147-total; 40729- superior
+period="2017"
+info_sidra(tabela)
+
+prop_ecolaridade_list <- list()
+#prop_energia_calculado <- list()
+for(i in 1:length(category)){
+  prop_ecolaridade <- lapply(mun_code,f,tabela=tabela,classificacao=classificacao,variavel=variavel,period=period,category=list(category[[i]]))
+  prop_ecolaridade_list[[i]] <- prop_ecolaridade
+}
+
+# melhor rodar separado. Ou fazer o join dentro do loop!
+prop_ecolaridade_df_total <- do.call(rbind,prop_ecolaridade_list[[1]])
+prop_ecolaridade_df_superior <- do.call(rbind,prop_ecolaridade_list[[2]])
+names(prop_ecolaridade_df_superior)[c(5)] <- "tem_superior"
+
+prop_ecolaridade_df_join <- left_join(prop_ecolaridade_df_total,prop_ecolaridade_df_superior[,c(5,6)])%>%
+  mutate(prop_escolaridade=tem_superior/Valor)
+
+
+write.csv(prop_energia_df_join,"tabelas_IBGE/IBGE_censo_agricola_2017_prop_com_energia.csv",row.names = F)
+
+#-------------------------------------------------------------------------------
+# distancia estrads
+#-------------------------------------------------------------------------------
+
+# dados de infra-estrutura estao disponiveis no Mapbiomas
+# https://brasil.mapbiomas.org/dados-de-infraestrutura?cama_set_language=pt-BR
+
+
+
