@@ -545,7 +545,7 @@ prop_ecolaridade_df_join <- left_join(prop_ecolaridade_df_total,prop_ecolaridade
   mutate(prop_escolaridade=tem_superior/Valor)
 
 
-write.csv(prop_energia_df_join,"tabelas_IBGE/IBGE_censo_agricola_2017_prop_com_energia.csv",row.names = F)
+write.csv(prop_ecolaridade_df_join,"tabelas_IBGE/IBGE_censo_agricola_2017_prop_com_ensino_superior.csv",row.names = F)
 
 #-------------------------------------------------------------------------------
 # distancia estrads
