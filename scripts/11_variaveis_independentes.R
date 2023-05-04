@@ -12,6 +12,8 @@
 #  
 #  research more variables -- for instance, agriculture suitability!, proportion of each land-use
 
+# adicionei tb variaveis do trabalho instituto escolhas
+
 #---- pacotes ------------------------------------------------------------------
 
 library(sidrar) # acesso API
@@ -179,7 +181,7 @@ write.csv(prop_area,"tables_IBGE/IBGE_2017_prop_areaover100ha.csv",row.names = F
 #  3. Value of agricultural production (in thousands of reais) per hectare of planted area
 # ------------------------------------------------------------------------------
 
-# ja baixei em scripts separados, e ja esta rasterizado como valor/ha - falta harmonizar resultados para reduzir outliers.
+# ja baixei em scripts separados, e ja esta rasterizado como valor/ha 
 
 # ------------------------------------------------------------------------------
 #  4. Value of agricultural subsidy/ha (fiz por populacao!) - dicutir!
@@ -295,6 +297,14 @@ write.csv(agricultural_gdp_df,"tabelas_IbGE/IBGE_2021_agricultural_GDP.csv",row.
 # ------------------------------------------------------------------------------
 
 # jo ja fez
+
+ibge_gdp = read.csv("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/IBGE_2020_mun_GDP.csv")
+
+ibge_pop = read.csv("/dados/projetos_andamento/custo_oportunidade/tables_IBGE/IBGE_2020_pop_mun.csv")
+
+ibge_gdp$gdp_per_capita = ibge_gdp$Valor/ibge_pop$Valor
+
+write.csv(x = ibge_gdp, file =  "/dados/projetos_andamento/custo_oportunidade/tables_IBGE/IBGE_2020_mun_GDP_per_capita.csv")
 
 #-------------------------------------------------------------------------------
 # 7. Proportion (%) of landowners in relation to total agricultural producers
@@ -554,5 +564,107 @@ write.csv(prop_ecolaridade_df_join,"tabelas_IBGE/IBGE_censo_agricola_2017_prop_c
 # dados de infra-estrutura estao disponiveis no Mapbiomas
 # https://brasil.mapbiomas.org/dados-de-infraestrutura?cama_set_language=pt-BR
 
+# baixando os dados
+
+p_rod_fed <- "https://mapbiomas-br-site.s3.amazonaws.com/Dados%20de%20Infraestrutura%20Cole%C3%A7%C3%A3o%207/Tabela%20Transportes/1.5.2_Rodovia_Federal-20230427T123110Z-001.zip"
+
+download.file(url = p_rod_fed,destfile = "/dados/projetos_andamento/custo_oportunidade/shapes/rod_federais.zip")
 
 
+p_rod_est <- "https://mapbiomas-br-site.s3.amazonaws.com/Dados%20de%20Infraestrutura%20Cole%C3%A7%C3%A3o%207/Tabela%20Transportes/1.5.1_Rodovia_Estadual-20230427T123108Z-001.zip"
+
+
+download.file(url = p_rod_est,destfile = "/dados/projetos_andamento/custo_oportunidade/shapes/rod_estaduais.zip")
+
+
+# descompactando
+
+unzip(zipfile ="/dados/projetos_andamento/custo_oportunidade/shapes/rod_estaduais.zip" )
+
+unzip(zipfile ="/dados/projetos_andamento/custo_oportunidade/shapes/rod_federais.zip" ,exdir = "/dados/projetos_andamento/custo_oportunidade/shapes")
+
+# carregando sem buffer!
+rod_fed <- st_read("/dados/projetos_andamento/custo_oportunidade/shapes/1.5.2 Rodovia Federal/rodovia-federal.shp")
+
+rod_est <- st_read("/dados/projetos_andamento/custo_oportunidade/shapes/1.5.1 Rodovia Estadual/rodovia-estadual.shp")
+
+plot(st_geometry(rod_est))
+
+# raster base:
+
+r <- raster("/dados/projetos_andamento/TRADEhub/GLOBIOMbr/land_uses_1km/Baseline_2020/cropland_1km.tif")
+
+# reproject to match the raster dataset
+
+rod_fed_pj <- st_transform(x = rod_fed ,crs = crs(r))
+rod_est_pj <- st_transform(x = rod_est ,crs = crs(r))
+
+#library(gdistance)
+
+# buffer (1km, ou a definir, testei outros valores)
+
+rod_fed_pjbuff <- st_buffer(x = rod_fed_pj ,dist = 1000)%>%
+  mutate(r_value=1)
+
+rod_est_pjbuff <- st_buffer(x = rod_est_pj ,dist = 1000)%>%
+  mutate(r_value=1)
+
+plot(st_geometry(rod_est_pjbuff))
+roads_raster <- fasterize(rod_fed_pjbuff, r, field = "r_value")
+roads_raster_est <- fasterize(rod_est_pjbuff, r, field = "r_value")
+
+dist_raster <- raster::distance(roads_raster) 
+dist_raster_est <- raster::distance(roads_raster_est) 
+
+
+library(geobr)
+
+br <- read_country()
+br_pj <- st_transform(br, crs = crs(r))
+
+distance_raster_km_c <- crop(dist_raster_est,br_pj)
+distance_raster_km_m <- mask(distance_raster_km_c,br_pj)
+
+plot(distance_raster_km_m/10^3)
+distance_raster_km<- distance_raster_km_m/10^3
+
+writeRaster(distance_raster_km,"/dados/projetos_andamento/custo_oportunidade/raster_IBGE/distance_state_roads_km.tif")
+
+#-------------------------------------------------------------------------------
+# distancia portos
+#-------------------------------------------------------------------------------
+# link arquivo portos mapbiomas
+p_portos <- "https://mapbiomas-br-site.s3.amazonaws.com/Dados%20de%20Infraestrutura%20Cole%C3%A7%C3%A3o%207/Tabela%20Transportes/1.2.6_Porto-20230427T123036Z-001.zip"
+
+# baixando
+download.file(url = p_portos,destfile = "/dados/projetos_andamento/custo_oportunidade/shapes/portos.zip")
+# unzip
+unzip(zipfile ="/dados/projetos_andamento/custo_oportunidade/shapes/portos.zip" ,exdir = "/dados/projetos_andamento/custo_oportunidade/shapes")
+
+# carregando sem buffer!
+portos <- st_read("/dados/projetos_andamento/custo_oportunidade/shapes/1.2.6_Porto/Porto-organizado.shp")
+# ajustando projecao
+portos_pj <- st_transform(x = portos ,crs = crs(r))
+
+# Create a raster with the desired resolution and extent
+raster_template <- raster(extent(r), res = res(r))
+
+# Extract the coordinates from the sf object
+coords <- st_coordinates(portos_pj)
+
+# Create a data.frame with the coordinates
+
+df <- data.frame(coords)
+
+
+# Calculate the minimum distance from each pixel to the nearest point
+distance_ports_km <- distanceFromPoints(raster_template,df)/1000
+
+plot(distance_ports_km)
+
+distance_port_raster_km_c <- crop(distance_ports_km,br_pj)
+distance_port_raster_km_m <- mask(distance_port_raster_km_c,br_pj)
+
+plot(distance_port_raster_km_m)
+
+writeRaster(distance_port_raster_km_m,"/dados/projetos_andamento/custo_oportunidade/raster_IBGE/distance_ports_km.tif")
