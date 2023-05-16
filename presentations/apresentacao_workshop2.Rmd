@@ -1,0 +1,343 @@
+---
+title: "Custo de oportunidade da terra"
+subtitle: "Modelo preditivo"  
+author: 
+  - "Francisco d'Albertas"
+  
+date: '`r Sys.Date()`'
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: [xaringan-themer.css]
+    nature:
+      slideNumberFormat: "%current%"
+      highlightStyle: github
+      highlightLines: true
+      ratio: 16:9
+      countIncrementalSlides: false
+   
+
+
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = F)
+knitr::opts_chunk$set(
+  fig.width=9, fig.height=3.5, fig.retina=3,
+  out.width = "100%",
+  cache = FALSE,
+  echo = TRUE,
+  message = FALSE, 
+  warning = FALSE,
+  hiline = TRUE
+)
+
+# set engines
+knitr::knit_engines$set("markdown")
+xaringanExtra::use_tile_view()
+#xaringan::inf_mr()
+xaringanExtra::use_panelset()
+xaringanExtra::use_clipboard()
+xaringanExtra::use_webcam()
+xaringanExtra::use_broadcast()
+xaringanExtra::use_share_again()
+xaringanExtra::style_share_again(
+  share_buttons = c("twitter", "linkedin", "pocket")
+)
+
+
+
+```
+
+
+```{r xaringan-themer, include=FALSE, warning=FALSE}
+library(xaringanthemer)
+library(xaringanExtra)
+
+
+#style_mono_light(base_color = "#23395b")
+
+style_xaringan(background_image="https://www.iis-rio.org/wp-content/themes/iis/assets/images/iis-pt.svg",background_size= '15%',background_position= '5% 98%',inverse_background_color="#23395b",text_color='#23395b',header_color='#23395b')
+
+```
+
+# Fontes de dados
+
+- Producao agricola:
+  - Agricultura: PAM (2021)
+  - Pecuaria: PAM (2021) + Censo agricola (2017)
+  - Silvicultura: PAM (2021)
+
+- Uso do solo
+  - Mapbiomas
+  
+- Aptidao agricola
+  - Modelagem imaflora
+  
+- Valor da terra
+  - Receita federal (2022)
+
+[Github](https://github.com/IIS-Rio/custo_oportunidade_terra); Caminho servidor: projetos_andamento/custo_oportunidade 
+---
+# Passos metodologicos
+
+.pull-left[
+
+**Producao agricola**
+
+- Obter dados de valor producao/ha:
+- Espacializacao dos resultados (celulas de ~ 1km) 
+- Cruzamento com usos do solo (mapbiomas)
+
+**Uso do solo**
+
+- Script GEE calcula fracao de usos do solo para o Br, na resolucao espacial adequada
+
+**Apidao agricola**
+- Adequacao da resolucao espacial dos dados de entrada (apitao solo, clima, relevo)
+- Calculo da aptidao media (media aritmetica das 3 variaveis de aptidao)
+- Categorizacao em aptidao baixa, media e alta
+
+]
+
+.pull-right[
+
+**Valor da terra nua (VTN)**
+- Compatibilizacao dos dados
+- Espacializacao dos dados
+- Cruzamento VTN x usos solo x apitdao categorica
+
+]
+
+---
+# Variaveis preditoras 
+
+.pull-left[
+
+### variaveis já apresentadas
+- grau urbanizacao (%) 
+- proporcao propriedades > 100 ha
+- valor producao agricola (R$/ha)
+- valor credito agricola(R$/populacao)
+- Contribuicao PIB agricola (PIB agricola/PIB total)
+- Distancia euclidiana muncipio > 500k habitantes (km)
+- Aptidao clima, relevo, solo
+- Proporcao pastagem
+- Proporcao vegetacao nativa
+- Proporcao agricultura
+
+]
+
+.pull-right[
+
+### novas variáveis incluídas
+- Proporcao proprietarios terra (IBGE)
+- PIB per capita (R$) (IBGE)
+- Número de tratores, em mil unidades (IBGE)
+- Número de pessoas ocupadas no estabelecimento, em mil pessoas (IBGE)
+- Capacidade de armazenamento (IBGE)
+- % de est. com energia (IBGE)
+- % proprietarios com ensino superior (IBGE)
+- Desmatamento(?)
+- Distancia a rodovias
+- Distancia a portos
+
+]
+
+---
+# Analise exploratoria
+
+.pull-left[
+
+- Todas as variaveis tem correlacao < 0.7
+
+```{r, echo=FALSE, out.width="100%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/corrplot.jpg")
+
+
+```
+
+]
+
+.pull-right[
+
+```{r, echo=FALSE, out.width="100%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/distribution.jpg")
+
+
+```
+
+
+]
+
+---
+
+# Preparando dados para uso no modelo
+
+- Como o volume de dados e muito grande, eu amostrei do total de dados (~ 2 milhoes de linhas), 50 pontos de dado por municipio, o que resultou em ~ 105 mil linhas
+
+- Em seguida, dividi os dados em 70% como training e 30% como testing
+
+- Escalei as variaveis
+
+
+---
+# Ajustando modelo usando maxima verossimilhanca
+**GLMM com identidade do municipio como variavel randomica**
+
+$$Y = VTN$$
+$$i = municipality$$
+
+$$\log(Y) \sim \mathcal{N}(\mu, \sigma) $$
+$$log(Y_i) = \beta_0 + \beta_1X_{1i} + \beta_2X_{2i} + ... + \epsilon_i$$
+---
+# Ajustando modelo usando maxima verossimilhanca
+
+**notacao modelo completo**
+
+full <- lme(fixed = VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021, random=list(~1|code_muni_IBGE), data=df_sc)
+
+- A partir desse modelo, eu comparei a verosimilhanca de todas as combinacoes possiveis de variaveis (considerando apenas modelos aditivos), pra chegar no melhor modelo (maior verossimilhanca e parcimonia)
+
+- Com o melhor modelo, adicionei um componente de autocorrelacao espacial e comparei novamente a verossimilhanca. O modelo que considera autocorrelacao espacial tem uma verossimilhanca bem maior, por isso escolhi esse
+
+---
+# melhor modelo 
+(comsiderando autocorrelacao espacial)
+
+```{r, echo=FALSE, out.width="55%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/effect_size_best_model.jpg")
+
+
+```
+
+
+
+---
+
+Marginal $R^2 = 0.37$
+
+```{r, echo=FALSE, out.width="90%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/predicted_values_glmm.jpg")
+
+
+```
+---
+
+# Ajustando modelo usando machine learning
+
+.pull-left[
+
+rfModel <- randomForest(formula=VTN_2022_log ~ DistCitiesover500k + PropPast + PropAgri + Relief + Climate + Soil + prop_urb + Prop_area_over_100ha + agri_subsidy_pop_total_2010 + PropAgriGDP + valor_prod_IBGE_2021 + PropNatVeg, data=df_sc, ntree=400)
+
+]
+
+.pull-right[
+```{r, echo=FALSE, out.width="100%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/variables_importance.jpg")
+
+
+```
+
+]
+
+---
+$R^2 = 0.39$;
+$RMSE = 1.40$
+
+```{r, echo=FALSE, out.width="90%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/predicted_values_randomForest.jpg")
+
+
+```
+---
+
+# Ajustando modelo usando machine learning
+
+Simplificando o modelo pegando as variaveis mais importantes **E ADICIONANDO X E Y**
+
+VTN_2022_log ~ DistCitiesover500k +  PropAgri +  Climate +   valor_prod_IBGE_2021 + PropNatVeg + x + y
+
+
+Usando funcao de random Forest rapido, que torna o ajuste do modelo muito rapido
+
+---
+
+$R^2 = 0.63$;
+$RMSE = 1.028679$
+
+```{r, echo=FALSE, out.width="90%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/predicted_values_randomForest_simplified.jpg")
+
+
+```
+
+---
+# Ajustando o modelo com as novas variáveis
+
+- Adicionei todas as variáveis mencionadas no primeiro slide.
+- Exclui distância estradas federais e mantive apenas estaduais
+- Teste de importancia indicou que todas "são importantes"
+- $R^2= 0.66$
+
+---
+Espacialização dados IBGE
+
+```{r, echo=FALSE, out.width="80%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/valor_producao_IBGE_2021.jpeg")
+
+
+```
+---
+Espacializacao dados VTN RF
+
+```{r, echo=FALSE, out.width="80%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/VTN_RF_2022.jpeg")
+
+
+```
+
+---
+Espacialização modelo predivito
+
+```{r, echo=FALSE, out.width="80%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/VTN_2022_predicted.jpeg")
+
+
+```
+---
+# comparacao com valores ja usados IIS (AM 2030)
+
+```{r, echo=FALSE, out.width="40%",fig.align='center'}
+
+knitr::include_graphics(path = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/scater_VTN_OC.jpeg")
+
+
+```
+
+
+---
+# Próximos passos
+- Resolver problemas do modelo
+  - autocorrelação espacial 
+  - preencher NAs
+  - discutir "importância" das variáveis
+
+- Conversão de VTN para arrendamento
+
+$$r = (\tau - g) \cdot VTN $$
+
+- $r$= valor arrendamento (reais $\cdot$ $ha^-1$)
+- $\tau$ =  taxa de juros
+- $g$ = taxa de ganho de capital
+
