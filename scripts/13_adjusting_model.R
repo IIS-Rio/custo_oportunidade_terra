@@ -38,7 +38,7 @@ df <- df[,-1]
 
 # Set the minimum number of data points per level
 
-min_data_points <- 50 # 100 pontos por municipio (testar varios pra ver oq muda - sensibilidae)
+min_data_points <- 30 # 100 pontos por municipio (testar varios pra ver oq muda - sensibilidae)
 
 # outros fators pra considerar eh ter dados representativos dos valores q eu quero modelar
 
@@ -691,4 +691,10 @@ ggsave("figures/predicted_values_randomForest_simplified.jpg",pane_RF,width = 28
 ################################################################################
 
 # se formos ficar com estimacao por verossimilhanca, talvez valha a pena migrar pra bayes.
+
+# outra opcao de spatialRF: https://rdrr.io/cran/SpatialML/man/grf.html
+# tb eh complicada pra dados grandes!
+
+# Adding spatial coordinates to a model is referred to as a providing "naive spatial structure".!!
+
 
