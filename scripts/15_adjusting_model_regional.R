@@ -13,6 +13,11 @@ library(dplyr)
 #library(purrr)
 library(sampler)
 library(ggcorrplot)
+library(randomForestSRC)
+library(ggRandomForests)
+library(randomForest)
+library(DHARMa)
+library(Boruta)
 
 #-------------------------------------------------------------------------------
 
@@ -66,11 +71,17 @@ testData <- na.omit(testData) # pra avaliar o ajuste
 # escalar todas as variaveis preditoras
 
 train_sc <- trainData
+test_sc <- testData
 
 # codigo regiao e municipio tem que ser fator
 
 train_sc$code_muni_IBGE <- as.factor(train_sc$code_muni_IBGE)
 train_sc$code_region <- as.factor(train_sc$code_region)
+
+test_sc$code_muni_IBGE <- as.factor(test_sc$code_muni_IBGE)
+test_sc$code_region <- as.factor(test_sc$code_region)
+test_sc$abbrev_state <- as.factor(test_sc$abbrev_state)
+
 
 # aplicando scale pras variaveis continuas (inclui x e y como variaveis escaladas)
 
@@ -78,26 +89,33 @@ train_sc$code_region <- as.factor(train_sc$code_region)
 
 continuous_variables <-which(sapply(train_sc, is.numeric) & !names(train_sc) == "VTN_2022")
 
+continuous_variables_test <-which(sapply(test_sc, is.numeric) & !names(test_sc) == "VTN_2022")
+
 # scale them
 
 train_sc_continuous <- as.data.frame(apply(train_sc[,c(continuous_variables)],2,scale))
 
+test_sc_continuous <- as.data.frame(apply(test_sc[,c(continuous_variables_test)],2,scale))
+
+
 # Create a new data frame with the scaled continuous variables and the non-continuous variables
+
 train_sc <- cbind(train_sc[, -continuous_variables], train_sc_continuous)
+test_sc <- cbind(test_sc[, -continuous_variables], test_sc_continuous)
 
 # correlacao linear entre as variaveis
 
-# eh preciso amostrar, n_maximo pontos <67k
-
-# testand delimitar n como 30% dos pontos
-
-train_sc_s <- ssamp(df = train_sc,n=round((nrow(train_sc)*0.3),0),strata = code_muni_IBGE)
-
-continuous_variables2 <-which(sapply(train_sc_s, is.numeric) & !names(train_sc) == "VTN_2022")
+# # eh preciso amostrar, n_maximo pontos <67k
+# 
+# # testand delimitar n como 30% dos pontos
+# 
+# train_sc_s <- ssamp(df = train_sc,n=round((nrow(train_sc)*0.3),0),strata = code_muni_IBGE)
+# 
+# continuous_variables2 <-which(sapply(train_sc_s, is.numeric) & !names(train_sc) == "VTN_2022")
 
 # Create a scatterplot matrix
 
-cor_df <- train_sc_s[,continuous_variables2]
+cor_df <- train_sc[,continuous_variables]
 cor_mat <- cor(cor_df)
 
 # tem variaveis correlacionadas
@@ -112,12 +130,105 @@ corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower",
 # x e Distancia cidades e portos (>0.7)
 # prop.agri e prop. nat veg (>0.7)
 
-# decidir quais manter...
-
 # ajustando modelo inicial (FULL)
 
-# variaveis preditoras
+# variaveis preditoras sem dist cidades e portos e sem prop. nat. veg.
 
-pred <- unlist(which(names(train_sc)!="VTN_2022"))
+excluir <- c("PropNatVeg","VTN_2022","dist_portos","DistCitiesover500k","VTN_2022_log","code_muni_IBGE","name_region","code_region")
 
 
+# corrigindo nomes - tira % prop com energia 
+
+names(train_sc)[24] <- "prop_com_energia"
+names(train_sc)[25] <- "prop_com_ens_superior"
+
+names(test_sc)[24] <- "prop_com_energia"
+names(test_sc)[25] <- "prop_com_ens_superior"
+
+# excluindo variaveis correlacionadas e resposta
+
+pred_posicao <- unlist(which(!names(train_sc) %in% excluir))
+pred_varnames <- names(train_sc[,pred_posicao])
+
+
+formula_full <- as.formula(paste("VTN_2022_log ~", paste(pred_varnames, collapse = "+")))
+
+# adicionando var. resp. em log
+
+train_sc$VTN_2022_log <- log(train_sc$VTN_2022)
+
+hist(train_sc$VTN_2022)
+hist(train_sc$VTN_2022_log)
+summary(train_sc$VTN_2022_log)
+# Convert all character columns to factors
+
+train_sc <- train_sc %>% mutate_if(is.character, as.factor)
+
+str(train_sc)
+
+# nao ta ajustando direito, so tem uma arvore, so 1 observacao por grupo (??)
+# parece ser um problema do pacote rfsrc...nao sei pq, antes funcionava.
+# experimentar poucas arvores (~100) e nodezise bem maior q 5 (default)
+# incluir x e y deveria contribuir com autocorrelacao espacial
+
+# train_sc_s <- ssamp(df = train_sc,n=500,strata = code_muni_IBGE)
+# str(train_sc_s)
+
+# selecao de variaveis
+
+set.seed(111)
+
+boruta.train <- Boruta(formula_full, data = train_sc, doTrace = 2,im)
+
+print(boruta.train)
+
+plot(boruta.train, cex.axis = 0.8)
+
+# esse nao funciona mais, sempre da problema! parar de usar!
+rfModel_full <- rfsrc(formula = formula_full , data = as.data.frame(train_sc), ntree = 100,nodesize = 20)
+
+summary(rfModel_full)
+
+# funciona normal (seria um problema de n?) foi aceitavel!
+rfModel_lerdo <- randomForest(formula = formula_full  , data = train_sc, ntree = 100,nodesize = 20)
+
+plot(rfModel_lerdo)
+summary(rfModel_lerdo)
+
+plot(rfModel_full)
+erro <- gg_error(rfModel_lerdo)
+
+plot(erro)
+
+plot(rfModel_full)
+# Plot the variable importance
+plot(gg_variable(rfModel_full))
+
+plot(gg_vimp(rfModel_lerdo))
+?gg_vimp
+
+
+# acuraria:
+
+actual <- log(test_sc$VTN_2022)
+test_sc$VTN_2022_log <- log(test_sc$VTN_2022)
+# mantendo apenas as mesmas colunas!
+test_sc2 <- test_sc %>% select(names(train_sc))
+predicted <- predict(object = rfModel_lerdo, newdata = test_sc2)
+
+r_full <- caret::R2(pred = predicted
+                    ,obs = actual) # 0.95!!
+
+
+library(ggpubr)
+
+toplot <- data.frame(atual=actual,predicted=predicted)
+names(toplot)
+ggscatter(x = "atual",y="predicted",data = toplot)
+
+summary(train_sc)
+summary(test_sc)
+
+
+summary(exp(predicted))
+hist(exp(predicted))
