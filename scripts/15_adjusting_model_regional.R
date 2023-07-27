@@ -29,13 +29,11 @@ p <- "/dados/projetos_andamento/custo_oportunidade/data_econometric_model/regioe
 
 f <- list.files(p,full.names = T) 
 
-################################################################################
-# teste inicial com regiao menor (SUL)
-################################################################################
-
 # variaveis preditoras
 
 reg_4 <- fread(f[4])
+reg_3 <- fread(f[3])
+reg_2 <- fread(f[2])
 
 # df com variavel resposta:
 
@@ -49,13 +47,20 @@ vr <- fread("/dados/projetos_andamento/custo_oportunidade/data_econometric_model
 # cod mun = 3
 # abbrev_state = 16
 
-reg_4 <- left_join(reg_4,vr[,c(2,3,10,11,17)])
+# deixar generico pra valer pra todas (pode ser um loop)
+
+reg <- reg_2 # muda dependendo da regiao interesse
+
+
+reg <- left_join(reg,vr[,c(2,3,10,11,17)])
 
 # pacote sampler
 
-# testand delimitar n como 30% dos pontos
+# testand delimitar n como 30% dos pontos (no caso do nordeste, tem mto NA no VTN. Melhor pegar uma amostra maior!)
 
-s <- ssamp(df = reg_4,n=round((nrow(reg_4)*0.3),0),strata = code_muni_IBGE)
+fracao_amostragrem <- 0.5 # varia conforme o bioma (sul, sudeste, 30%; nordeste tem mto NA, melhor pegar fracao maior)
+
+s <- ssamp(df = reg,n=round((nrow(reg)*fracao_amostragrem),0),strata = code_muni_IBGE)
 
 # dividindo dados 
 
@@ -103,15 +108,6 @@ test_sc_continuous <- as.data.frame(apply(test_sc[,c(continuous_variables_test)]
 train_sc <- cbind(train_sc[, -continuous_variables], train_sc_continuous)
 test_sc <- cbind(test_sc[, -continuous_variables], test_sc_continuous)
 
-# correlacao linear entre as variaveis
-
-# # eh preciso amostrar, n_maximo pontos <67k
-# 
-# # testand delimitar n como 30% dos pontos
-# 
-# train_sc_s <- ssamp(df = train_sc,n=round((nrow(train_sc)*0.3),0),strata = code_muni_IBGE)
-# 
-# continuous_variables2 <-which(sapply(train_sc_s, is.numeric) & !names(train_sc) == "VTN_2022")
 
 # Create a scatterplot matrix
 
@@ -127,15 +123,34 @@ corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower",
 
 # variaveis correlacionadas:
 
+# regiao 4:
 # x e Distancia cidades e portos (>0.7)
 # prop.agri e prop. nat veg (>0.7)
+
+# regiao 3:
+# clima e distancia cidades (WTF?!!)
+
+# regiao 2:
+# clima e x 
+# propnat veg e prop agri
 
 # ajustando modelo inicial (FULL)
 
 # variaveis preditoras sem dist cidades e portos e sem prop. nat. veg.
 
-excluir <- c("PropNatVeg","VTN_2022","dist_portos","DistCitiesover500k","VTN_2022_log","code_muni_IBGE","name_region","code_region")
+# regiao 4:
 
+# excluir <- c("PropNatVeg","VTN_2022","dist_portos","DistCitiesover500k","VTN_2022_log","code_muni_IBGE","name_region","code_region")
+
+# regiao 3:
+# eliminei climate
+
+excluir <- c("VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region","Climate")
+
+
+# regiao 2:
+
+excluir <- c("PropNatVeg","VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region","Climate")
 
 # corrigindo nomes - tira % prop com energia 
 
@@ -160,11 +175,10 @@ train_sc$VTN_2022_log <- log(train_sc$VTN_2022)
 hist(train_sc$VTN_2022)
 hist(train_sc$VTN_2022_log)
 summary(train_sc$VTN_2022_log)
+
 # Convert all character columns to factors
 
 train_sc <- train_sc %>% mutate_if(is.character, as.factor)
-
-str(train_sc)
 
 # nao ta ajustando direito, so tem uma arvore, so 1 observacao por grupo (??)
 # parece ser um problema do pacote rfsrc...nao sei pq, antes funcionava.
@@ -178,35 +192,32 @@ str(train_sc)
 
 set.seed(111)
 
-boruta.train <- Boruta(formula_full, data = train_sc, doTrace = 2,im)
+boruta.train <- Boruta(formula_full, data = train_sc, doTrace = 2)
 
 print(boruta.train)
 
 plot(boruta.train, cex.axis = 0.8)
 
-# esse nao funciona mais, sempre da problema! parar de usar!
-rfModel_full <- rfsrc(formula = formula_full , data = as.data.frame(train_sc), ntree = 100,nodesize = 20)
+# pra calcular erro por arvore precisa da opcao block.size=1! 
 
-summary(rfModel_full)
+rfModel_full <- rfsrc(formula = formula_full , data = as.data.frame(train_sc), ntree = 200,nodesize = 20,block.size = 1)
+# 
+# summary(rfModel_full)
 
 # funciona normal (seria um problema de n?) foi aceitavel!
-rfModel_lerdo <- randomForest(formula = formula_full  , data = train_sc, ntree = 100,nodesize = 20)
+
+# rfModel_lerdo <- randomForest(formula = formula_full  , data = train_sc, ntree = 100,nodesize = 20) # discutir node size mas com n grande eh ok
 
 plot(rfModel_lerdo)
-summary(rfModel_lerdo)
-
 plot(rfModel_full)
-erro <- gg_error(rfModel_lerdo)
+
+erro <- gg_error(rfModel_full, error.type = "oob")
 
 plot(erro)
 
-plot(rfModel_full)
 # Plot the variable importance
-plot(gg_variable(rfModel_full))
-
-plot(gg_vimp(rfModel_lerdo))
-?gg_vimp
-
+#plot(gg_variable(rfModel_full))
+plot(gg_vimp(rfModel_full))
 
 # acuraria:
 
@@ -214,21 +225,13 @@ actual <- log(test_sc$VTN_2022)
 test_sc$VTN_2022_log <- log(test_sc$VTN_2022)
 # mantendo apenas as mesmas colunas!
 test_sc2 <- test_sc %>% select(names(train_sc))
-predicted <- predict(object = rfModel_lerdo, newdata = test_sc2)
-
-r_full <- caret::R2(pred = predicted
-                    ,obs = actual) # 0.95!!
+predicted <- predict(object = rfModel_full, newdata = test_sc)
+r_full <- caret::R2(pred = predicted$predicted,obs = actual) # 0.95 (r4),0.97 (r3).0.92 (2)!!
 
 
 library(ggpubr)
 
 toplot <- data.frame(atual=actual,predicted=predicted)
-names(toplot)
+
 ggscatter(x = "atual",y="predicted",data = toplot)
 
-summary(train_sc)
-summary(test_sc)
-
-
-summary(exp(predicted))
-hist(exp(predicted))
