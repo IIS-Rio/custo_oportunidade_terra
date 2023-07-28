@@ -34,6 +34,8 @@ f <- list.files(p,full.names = T)
 reg_4 <- fread(f[4])
 reg_3 <- fread(f[3])
 reg_2 <- fread(f[2])
+reg_5 <- fread(f[5])
+reg_1 <- fread(f[1])
 
 # df com variavel resposta:
 
@@ -49,7 +51,7 @@ vr <- fread("/dados/projetos_andamento/custo_oportunidade/data_econometric_model
 
 # deixar generico pra valer pra todas (pode ser um loop)
 
-reg <- reg_2 # muda dependendo da regiao interesse
+reg <- reg_1 # muda dependendo da regiao interesse
 
 
 reg <- left_join(reg,vr[,c(2,3,10,11,17)])
@@ -58,7 +60,7 @@ reg <- left_join(reg,vr[,c(2,3,10,11,17)])
 
 # testand delimitar n como 30% dos pontos (no caso do nordeste, tem mto NA no VTN. Melhor pegar uma amostra maior!)
 
-fracao_amostragrem <- 0.5 # varia conforme o bioma (sul, sudeste, 30%; nordeste tem mto NA, melhor pegar fracao maior)
+fracao_amostragrem <- 0.5 # varia conforme o bioma (sul, sudeste, 30%; nordeste tem mto NA, melhor pegar fracao maior; centro-oeste=30%;Norte=50)
 
 s <- ssamp(df = reg,n=round((nrow(reg)*fracao_amostragrem),0),strata = code_muni_IBGE)
 
@@ -134,6 +136,14 @@ corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower",
 # clima e x 
 # propnat veg e prop agri
 
+# regiao 5 
+# nao tem
+
+# regiao 1:
+# clima e x 
+# propnat veg e prop past
+
+
 # ajustando modelo inicial (FULL)
 
 # variaveis preditoras sem dist cidades e portos e sem prop. nat. veg.
@@ -145,12 +155,22 @@ corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower",
 # regiao 3:
 # eliminei climate
 
-excluir <- c("VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region","Climate")
+#excluir <- c("VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region","Climate")
 
 
 # regiao 2:
 
-excluir <- c("PropNatVeg","VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region","Climate")
+#excluir <- c("PropNatVeg","VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region","Climate")
+
+# regiao 5:
+
+#excluir <- c("VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region")
+
+
+# regiao 2:
+
+excluir <- c("PropNatVeg","VTN_2022","VTN_2022_log","code_muni_IBGE","name_region","code_region")
+
 
 # corrigindo nomes - tira % prop com energia 
 
@@ -180,19 +200,12 @@ summary(train_sc$VTN_2022_log)
 
 train_sc <- train_sc %>% mutate_if(is.character, as.factor)
 
-# nao ta ajustando direito, so tem uma arvore, so 1 observacao por grupo (??)
-# parece ser um problema do pacote rfsrc...nao sei pq, antes funcionava.
-# experimentar poucas arvores (~100) e nodezise bem maior q 5 (default)
-# incluir x e y deveria contribuir com autocorrelacao espacial
-
-# train_sc_s <- ssamp(df = train_sc,n=500,strata = code_muni_IBGE)
-# str(train_sc_s)
-
 # selecao de variaveis
 
 set.seed(111)
 
 boruta.train <- Boruta(formula_full, data = train_sc, doTrace = 2)
+
 
 print(boruta.train)
 
@@ -201,14 +214,12 @@ plot(boruta.train, cex.axis = 0.8)
 # pra calcular erro por arvore precisa da opcao block.size=1! 
 
 rfModel_full <- rfsrc(formula = formula_full , data = as.data.frame(train_sc), ntree = 200,nodesize = 20,block.size = 1)
-# 
-# summary(rfModel_full)
 
-# funciona normal (seria um problema de n?) foi aceitavel!
+summary(rfModel_full)
+
 
 # rfModel_lerdo <- randomForest(formula = formula_full  , data = train_sc, ntree = 100,nodesize = 20) # discutir node size mas com n grande eh ok
 
-plot(rfModel_lerdo)
 plot(rfModel_full)
 
 erro <- gg_error(rfModel_full, error.type = "oob")
@@ -217,6 +228,7 @@ plot(erro)
 
 # Plot the variable importance
 #plot(gg_variable(rfModel_full))
+
 plot(gg_vimp(rfModel_full))
 
 # acuraria:
@@ -224,14 +236,15 @@ plot(gg_vimp(rfModel_full))
 actual <- log(test_sc$VTN_2022)
 test_sc$VTN_2022_log <- log(test_sc$VTN_2022)
 # mantendo apenas as mesmas colunas!
-test_sc2 <- test_sc %>% select(names(train_sc))
+test_sc2 <- as.data.frame(test_sc)
+#test_sc2 <- test_sc %>% select(names(train_sc))
 predicted <- predict(object = rfModel_full, newdata = test_sc)
-r_full <- caret::R2(pred = predicted$predicted,obs = actual) # 0.95 (r4),0.97 (r3).0.92 (2)!!
+r_full <- caret::R2(pred = predicted$predicted,obs = actual) # 0.95 (r4),0.97 (r3).0.92 (2), 0.96(5)/ 0.94(1)!!
 
 
 library(ggpubr)
 
-toplot <- data.frame(atual=actual,predicted=predicted)
+toplot <- data.frame(atual=actual,predicted=predicted$predicted)
 
 ggscatter(x = "atual",y="predicted",data = toplot)
 
