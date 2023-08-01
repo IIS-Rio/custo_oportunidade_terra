@@ -14,6 +14,7 @@ library(dplyr)
 library(scales)
 library(geobr)
 library(ggpubr)
+library(sf)
 #---------------------------------------------------------------------------
 
 p <- "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5"
@@ -66,52 +67,67 @@ for (i in 1:length(regioes)){
 
 VTN_pred_df_combinado <- do.call(rbind,lista_df)
 
-VTN_pred_p <- ggplot(VTN_pred_df_combinado, aes(x = x, y = y, fill = layer)) +
-  geom_tile() +
-  scale_fill_viridis_c(option = "magma", direction = -1, 
-                       breaks = c(0, 5000,10000,20000,40000,60000,80000,10000,200000,260000),
-                       labels = comma) +
-  labs(title = "Valor terra nua (2022)", fill = "R$/ha") +
-  theme_map()+
-  facet_wrap("regiao")
+# VTN_pred_p <- ggplot(VTN_pred_df_combinado, aes(x = x, y = y, fill = layer)) +
+#   geom_tile() +
+#   scale_fill_viridis_c(option = "magma", direction = -1, 
+#                        breaks = c(0, 5000,10000,20000,40000,60000,80000,10000,200000,260000),
+#                        labels = comma) +
+#   labs(title = "Valor terra nua (2022)", fill = "R$/ha") +
+#   theme_map()+
+#   facet_wrap("regiao")
 
 small_constant <- 0.0001
 
-summary((VTN_pred_p$layer))
-
-VTN_pred_p <- VTN_pred_df_combinado%>%
-  filter(regiao=="centro-oeste")
 
 Br <- read_country()
 Br_pj <- st_transform(Br,crs(smoothed_r[[1]]))
-
+regioes_sh <- read_region()
+regioes_pj <- st_transform(regioes_sh,crs(smoothed_r[[1]]))
 
 regioes_plot <- list()
 c=1
-for(regiao in regioes){
+for(rg in regioes){
   
-  VTN_pred_p <- VTN_pred_df_combinado%>%
-    filter(regiao==regiao)%>%
+  VTN_pred_p <- VTN_pred_df_combinado %>%
+    filter(regiao==rg) %>%
     mutate(value=layer+small_constant) %>%
     ggplot() +
     geom_sf(data=Br_pj, fill="lightgray",color=NA)+
     geom_tile(aes(x = x, y = y, fill = value)) +
-    scale_fill_viridis_c(option = "magma", direction = -1,breaks = c(0, 10000,20000,40000,60000,80000,10000,200000,300000),
+    scale_fill_viridis_c(option = "magma", direction = -1,
                          labels = comma,trans = "log10") +
-    labs(title = paste("Valor terra nua (2022):",regiao), fill = "R$/ha")+
-    theme_map()
+    labs(title = paste("Valor terra nua (2022):",rg), fill = "R$/ha")+
+    theme_map()+
+    theme(text=element_text(size=7))
   regioes_plot[[c]] <- VTN_pred_p
   c=c+1
 }
 
+# mapa completo
+
+r_br <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_VTN/predicted_VTN_BR_mosaico.tif")
+
+r_br_DF <- as.data.frame(r_br, xy = TRUE)
+
+VTN_pred_p_br <- r_br_DF %>%
+  #filter(regiao==rg) %>%
+  mutate(value=layer+small_constant) %>%
+  ggplot() +
+  geom_sf(data=Br_pj, fill="lightgray",color=NA)+
+  geom_tile(aes(x = x, y = y, fill = value)) +
+  scale_fill_viridis_c(option = "magma", direction = -1,
+                       labels = comma,trans = "log10") +
+  labs(title = paste("Valor terra nua (2022): Brasil"), fill = "R$/ha")+
+  theme_map()+
+  theme(text=element_text(size=7))
+
+regioes_plot[[6]] <- VTN_pred_p_br
 
 pannel <- ggarrange(plotlist = regioes_plot,common.legend = T)
 
 
-regioes_plot[[1]]
-
-ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/regional_VTN.jpeg",plot = pannel,width = 16,height = 9,units = "cm")
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/regional_VTN.jpeg",plot = pannel,width = 32,height = 18,units = "cm")
   
   
-
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/regional_VTN_Br.jpeg",plot = VTN_pred_p_br,width = 16,height = 18,units = "cm")
 
