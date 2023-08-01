@@ -110,6 +110,8 @@ r_br <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_VTN/predict
 r_br_DF <- as.data.frame(r_br, xy = TRUE)
 
 VTN_pred_p_br <- r_br_DF %>%
+  # removendo NAs
+  filter(!is.na(layer))%>%
   #filter(regiao==rg) %>%
   mutate(value=layer+small_constant) %>%
   ggplot() +

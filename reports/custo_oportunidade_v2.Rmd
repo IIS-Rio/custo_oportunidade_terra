@@ -1,0 +1,106 @@
+---
+title: "Desenvolvimento da camada de Custo de oportunidade da terra para o Brasil"
+author: "Francisco d'Albertas"
+date: "`r Sys.Date()`"
+output: html_document 
+
+#pdf_document
+#
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introdução
+
+Desenvolvemos uma camada de valor da terra nua (**VTN**) para toda a extensão do Brasil. Ela foi gerada a partir de um modelo preditivo utilizando valores de VTN disponíveis para consulta pública e variáveis espaciais de uso e cobertura da terra, bem como variáveis socioeconômicas.
+
+Completar com alguma referência sobre isso e incluir objetivos/usos possiveis.
+
+
+## Metodologia
+### Valor da terra nua
+
+A receita federal disponibiliza, desde 2019, valores de VTN anuais para um conjunto de Estados e Municípios do Brazil. Essas informações podem ser obtidas em formato pdf no endereço eletrônico **xxxxxx** e precisaram ser convertidas em formato tabular. Para o ano de 2022, há dados disponíveis para 2664 municípios, distribuidos em 19 unidades federativas (Figura 1).
+
+
+```{r echo=FALSE, message=FALSE,warning=FALSE, fig.cap="Figura 1: Descrever"}
+
+library(data.table)
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+
+VTN_data <- fread(input = "/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_2022_NA_filled.csv")
+
+
+# Create a summary data frame to count the number of municipalities per state
+summary_data <- VTN_data %>%
+  group_by(UF, name_region) %>%
+  summarize(Number_of_Municipios = n_distinct(Nome.Município))
+
+# Create the ggplot bar plot
+ggplot(summary_data, aes(x = Number_of_Municipios, y = reorder(UF, Number_of_Municipios),fill = name_region)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Número municípios", y = "UF") +
+  theme_minimal() 
+
+
+```
+
+Os dados compreendem informações em reais/ha, do valor da terra nua para as seguintes classes de uso da terra, com exceção do estado do Amazonas, em que só há um valor único de VTN: lavoura de aptitão boa, regular e restrita; pastagem plantada; silvicultura ou pastagem natural; preservação. Nos casos em que havia valores faltantes para alguma das classes para um dado município, preenchemos com o valor médio da unidade federativa no caso de silvicultura, pastagem e preservação. Para as classes de lavoura, substituímos os valores faltantes pelos valores disponíveis, utilizando quando possível o valor mais conservador (por exemplo, se o valor faltante é de lavoura de alta aptidão, favorecemos a substituição usando os valores de aptidão regular e assim por diante).
+
+Finalmente, após a compilação dos dados tabulares de VTN para todos os municípios disponiveis, criamos um grid de aproximadamente 1 km, utilizando a projeção de Mollenweide(rever como escreve)(Figura 2) contendo em cada celula um código identificador de cada um dos municípios para os quais há dados de VTN.
+
+### Uso e cobertura da terra e aptidão agrícola
+
+Utilizamos os dados de uso e cobertura da terra para o ano de 2020 do mapbiomas, reclassificados nas seguintes categorias: lavoura, pastagem, vegetação nativa, silvicultura, usos ignorados. A partir dessas classes, calculamos para uma grade de 1km, seguindo a projeção de Mollenweide, a fração de cada celula ocupada por estas classes. 
+
+As informações de aptidão agrícola utilizadas foram desenvolvidas por XX et al(XXXX). Os autores desenvolveram camadas de aptidão climática, de solo e relevo, com 30 metros de resolução para todo o Brasil. A partir delas, calculamos a aptidão agrícola média e reamostramos a camada para a mesma resoulução e projeção da camada de uso e cobertura do solo.
+
+### Espacializando os dados
+
+Com as camadas de aptidão, identidade dos municipios e uso e cobertura da terra harmonizadas para a mesma projeção e resolução espacial, foi possível espacializar os dados de VTN (Figura 2)
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+library(raster)
+library(geobr)
+library(knitr)
+# gerando a figura
+# VTN_RF <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2022/VTN_ha_RF_agg_2022_smoothed.tif")
+# 
+# VTN_RF_df <- as.data.frame(VTN_RF, xy = TRUE)
+# 
+# 
+# Br <- read_country()
+# Br_pj <- st_transform(Br,crs(VTN_RF))
+# small_constant <- 0.0001
+# 
+# VTN_RF_p <- VTN_RF_df %>%
+#   # removendo NAs
+#   filter(!is.na(layer))%>%
+#   #filter(regiao==rg) %>%
+#   mutate(value=layer+small_constant) %>%
+#   ggplot() +
+#   geom_sf(data=Br_pj, fill="lightgray",color=NA)+
+#   geom_tile(aes(x = x, y = y, fill = value)) +
+#   scale_fill_viridis_c(option = "magma", direction = -1,
+#                        labels = comma,trans = "log10") +
+#   labs(title = paste("Valor terra nua (2022): Brasil"), fill = "R$/ha")+
+#   theme_map()+
+#   theme(text=element_text(size=7))
+# 
+# 
+# ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/VTN_RF.jpeg",plot = VTN_RF_p,width = 16,height = 18,units = "cm")
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/VTN_RF.jpeg")
+
+
+
+```
+
+### Variáveis independentes
+
+Completar com todas as variáveis utilziadas em uma tabela com o nome, fonte e a justificativa para ter usado essa camada.
+
+Continuar
