@@ -142,8 +142,6 @@ Para cada amostra regional, separamos os dados de entrada do modelo em 2: 70% do
 
 Finalmente, ajustamos modelos *Random Forest* utilizando o pacote randomForestSRC[-@random], com 200 árvores e nós com n=20. A partir do ajuste dos modelos e avaliação de sua acurácia ($RMSE$ e $R^2$), calculamos os valores preditos de VTN para todas as células da nossa base. Nesse caso, quando havia celulas com valor "NA" nas colunas de variaveis preditoras, utilizamos o valor mediano para a região. Com os valores preditos, geramos uma imagem matricial contendo o valor da terra nua, em reais $ha^{-1}$ para todo o Brasil, para o ano de 2022.
 
-
-
 # Resultados
 
 Utilizando a base de dados de valor da terra nua (VTN) da Receita Federal e uma séride de variáveis socioeconômicas e biofísicas, fomos capazes de gerar modelos preditivos de alta acurácia (as métricas de acurácia estão descritas na Tabela 2). Com esses modelos, geramos imagens matriciais para cada região contendo em cada célula da matriz o valor predito de VTN. De modo a suavizar possiveis valores extremos, utilizamos uma abordagem de *moving-window*  para cada uma das camadas regionais, em que o valor de cada célula corresponde ao valor médio das 9 células vizinhas. Finalmente, juntamos as 5 regiões em uma imagem matricial única para o Brasil, com o valor da terra nua para 2022 (Figuras 3 e 4).

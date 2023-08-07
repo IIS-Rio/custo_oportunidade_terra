@@ -4,7 +4,7 @@ subtitle: "Modelo preditivo"
 author: 
   - "Francisco d'Albertas"
   
-date: '`r Sys.Date()`'
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
   xaringan::moon_reader:
     self_contained: true
