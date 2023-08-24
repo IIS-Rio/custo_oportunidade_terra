@@ -25,19 +25,6 @@ vtns_complementar <- read.csv("/dados/projetos_andamento/custo_oportunidade/mun_
 
 repet <- VTN_2022[duplicated(VTN_2022$code_muni),]
 
-# oq ta repetido sao NAs (ja resolvidos)
-#repet_comp <- vtns_complementar[duplicated(vtns_complementar$code_muni),]
-# eram esses municipios com nome diferente na base fr e ibge
-# POXOREO == poxoréu
-# BALNEARIO DE PICARRAS == Balneário Piçarras
-# GRAO PARA == Grão-Pará
-# BIRITIBA-MIRIM ==Biritiba Mirim
-# SAO VALERIO DA NATIVIDADE == São Valério
-# AMPARO DA SERRA == Amparo Do Serra
-# BARAO DO MONTE ALTO == Barão De Monte Alto
-# BOM JESUS DO PIAUI == Bom Jesus
-
-
 VTN_2022_filt <- VTN_2022[!row.names(VTN_2022) %in% row.names(repet),]
 
 
@@ -95,12 +82,11 @@ media_lavoura_aptidao_regular <- VTN_df%>%
 pastagem_lista <- list()
 UFs <- unique(VTN_df$abbrev_state)
 
-for (i in UFs[-1]){ # tira cearea q tem valor unico
+for (i in UFs){ # tira cearea q tem valor unico
   VTN_df_s <- filter(VTN_df,abbrev_state==i)
   # pra cada UF, roda todas as linhas e substitui pastagem plantada por silvicultura qndo nao tem valor
   for (j in 1:nrow(VTN_df_s)){
     if(is.na(VTN_df_s$Pastagem.Plantada[j])){
-      
       VTN_df_s$Pastagem.Plantada[j] <- VTN_df_s$Silvicultura.ou.pastagem.Natural[j]
       
     }
@@ -252,11 +238,15 @@ for (i in UFs[-1]){
 
 df_lavoura_ruim <- do.call(rbind,lavoura_ruim_lista)
 
+# colocando de volta dados dos valores unicos
 
+# no caso dos dados complementares, UF==CE
+
+df_final <- rbind(df_lavoura_ruim,vtns_complementar[vtns_complementar$UF=="CEARA - CE",])
 
 # salvando planilha atualizada e sem NAs!
 
 
 write.csv(df_preservacao,"/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_2022_NA_filled.csv",row.names = F)
 
-write.csv(df_lavoura_ruim,"/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_RF_2019_20_complementares_NA_filled.csv",row.names = F)
+write.csv(df_final,"/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_RF_2019_20_complementares_NA_filled.csv",row.names = F)
