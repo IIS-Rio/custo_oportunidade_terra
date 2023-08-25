@@ -96,7 +96,7 @@ for (i in 1:length(regioes)){
 
 
   # Create a 1km resolution raster with the same extent and projection as your   polygons
-  co <- regioes_limites_pj%>%filter(name_region==regioes[1])
+  co <- regioes_limites_pj%>%filter(name_region==regioes[i])
   raster_template <- raster(extent(co), resolution = res(r_base))
   crs(raster_template) <- crs(r_base)
   co_raster <- fasterize(co,raster_template)
@@ -124,3 +124,22 @@ for (i in 1:length(regioes)){
   writeRaster(proportion_covered,filename = file.path("/dados/projetos_andamento/custo_oportunidade/rasters_base_fundiaria",paste0(regioes[i],"_proporcao_propriedade_privada.tif")),overwrite=T)
 
 }
+
+
+# vizualizando 
+
+norte <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_base_fundiaria/norte_proporcao_propriedade_privada.tif")
+ne <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_base_fundiaria/nordeste_proporcao_propriedade_privada.tif")
+
+
+co <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_base_fundiaria/centro_oeste_proporcao_propriedade_privada.tif")
+plot(co)
+se <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_base_fundiaria/sudeste_proporcao_propriedade_privada.tif")
+
+sul <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_base_fundiaria/sul_proporcao_propriedade_privada.tif")
+
+plot(norte)
+plot(ne)
+plot(se)
+plot(sul)
+plot(co)

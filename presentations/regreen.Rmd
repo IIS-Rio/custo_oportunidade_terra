@@ -1,0 +1,245 @@
+---
+title: "Valor da terra para o Brasil"
+subtitle: "Proposta inicial"  
+author: 
+  - "Francisco d'Albertas"
+  - "f.albertas@iis-rio.org"
+  
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    css: [xaringan-themer.css]
+    nature:
+      slideNumberFormat: "%current%"
+      highlightStyle: github
+      highlightLines: true
+      ratio: 16:9
+      countIncrementalSlides: false
+
+---
+
+# Objetivo
+
+
+### Desenvolver uma metodologia para camada de preço da terra para o Brasil e/ou biomas específicos, com 1 km de resolução, para o ano de 2022, que seja atualizável;
+
+---
+# Metodologia Proposta
+
+.pull-left[
+
+- Utilizar bancos de dados de Valor da Terra Nua (**VTN**):
+  - Base de dados da receita federal: disponível para 2019-2022, com previsão de atualização anual, de acesso gratuíto;
+  - Busca ativa por bases de dados estaduais disponíveis gratuitamente;
+  - Base de dados da consultoria FNP: acesso pago;
+- Espacializar os dados em uma grade de 1km para a área de interesse;
+
+]
+
+.pull-right[
+
+```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="70%",fig.align='center', fig.cap="Cobertura dados VTN disponibilizados pela RF para 2022"}
+
+library(knitr)
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/VTN_RF.jpeg")
+
+
+```
+
+]
+
+---
+# Metodologia Proposta
+
+```{r , echo=FALSE, results='asis', message=FALSE,warning=FALSE}
+
+library(data.table)
+library(tidyverse)
+library(kableExtra)
+# Read the CSV file
+VTN <- fread("/dados/projetos_andamento/custo_oportunidade/data/VTN_RF_2022.csv")%>%filter(UF=="MINAS GERAIS - MG")
+
+# kbl(indep_var[,c(1,2,5)], caption = "Potencias variáveis preditoras para  o modelo preditivo de valor da terra nua.",booktabs = T) %>%
+#  kable_styling(full_width = T) 
+
+DT::datatable(
+  VTN[,-c(2,3)],
+  fillContainer = FALSE, 
+  options = list( scrollY = "300px",
+                  pageLength = 23,
+                  dom = "ti")
+)
+
+
+```
+
+
+
+
+
+---
+# Metodologia Proposta
+.pull-left[**Uso e cobertura do solo**
+
+- Mapbiomas
+
+```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="50%",fig.align='center'}
+#library(raster)
+#library(geobr)
+library(knitr)
+#library(sf)
+
+# gerando a figura
+
+# lavoura <- raster("/dados/projetos_andamento/custo_oportunidade/lu_mapbiomas_2020_1km/cropland_1km.tif")
+# 
+# lavoura_df <- as.data.frame(lavoura, xy = TRUE)
+# 
+# 
+# Br <- read_country()
+# Br_pj <- st_transform(Br,crs(aptidao))
+# 
+# lavoura_df_p <- lavoura_df %>%
+#   # removendo NAs
+#   filter(!is.na(layer))%>%
+#   #filter(regiao==rg) %>%
+#   ggplot() +
+#   geom_sf(data=Br_pj, fill="lightgray",color=NA)+
+#   geom_tile(aes(x = x, y = y, fill = layer)) +
+#   scale_fill_viridis_c(option = "magma", direction = -1,
+#                        labels = comma) +
+#   #scale_fill_manual(values = categorical_colors)+
+#   labs(title = paste("Proporção agricultura"), fill = "0-1")+
+#   theme_map()+
+#   theme(text=element_text(size=7))
+
+
+# ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/proporcao_agricultura.jpeg",plot = lavoura_df_p,width = 16,height = 18,units = "cm")
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/proporcao_agricultura.jpeg")
+
+
+
+```
+
+
+]
+.pull-right[
+**Aptidão agrícola**
+
+- Safanelli,  et al. 2023 $^1$ 
+
+```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="50%",fig.align='center'}
+
+#library(raster)
+#library(geobr)
+library(knitr)
+#library(sf)
+
+# gerando a figura
+
+# aptidao <- raster("/dados/projetos_andamento/custo_oportunidade/aptidao_agricola/aptidao_media_3_classes.tif")
+# 
+# aptidao_df <- as.data.frame(aptidao, xy = TRUE)
+# 
+# 
+# Br <- read_country()
+# Br_pj <- st_transform(Br,crs(aptidao))
+# 
+# # Define categorical colors for each class
+# categorical_colors <- c("lightblue", "lightgreen", "lightpink")
+# 
+# aptidao_df_p <- aptidao_df %>%
+#   # removendo NAs
+#   filter(!is.na(layer))%>%
+#   #filter(regiao==rg) %>%
+#   ggplot() +
+#   geom_sf(data=Br_pj, fill="lightgray",color=NA)+
+#   geom_tile(aes(x = x, y = y, fill = factor(layer))) +
+#   #scale_fill_viridis_c(option = "magma", direction = -1,
+#   #                     labels = comma) +
+#   scale_fill_manual(values = categorical_colors)+
+#   labs(title = paste("Aptidão agrícola média"), fill = "(1)baixa-(3)alta")+
+#   theme_map()+
+#   theme(text=element_text(size=7))
+# 
+# 
+# ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/aptidao_media.jpeg",plot = aptidao_df_p,width = 16,height = 18,units = "cm")
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/aptidao_media.jpeg")
+
+
+
+```
+
+
+
+]
+
+
+
+.footnote[
+
+$^1$Safanelli et al. 2023. “Grain-Cropping
+Suitability for Evaluating the Agricultural Land Use Change in Brazil.” Applied Geography. https://doi.org/10.1016/j.apgeog.2023.102937.
+
+]
+
+
+---
+# Metodologia Proposta
+
+- Calcular variáveis biofísicas, socieconômicas e de uso e cobertura da terra (a partir de revisão da literatura) que podem explicar a distribuição de VTN do banco de dados para cada célula da grade de 1km;
+
+.footnote[
+
+As variaveis foram baseadas em: Instituto Escolhas. 2022. “Como o Agro Brasileiro Se Beneficia Do Desmatamento?”; Marqueset al., 2023. “Spatial Effects Are Determinants of Agricultural Land Prices in Brazil.” Revista de Economia e Sociologia Rural
+]
+
+```{r , echo=FALSE, results='asis', message=FALSE,warning=FALSE}
+
+library(data.table)
+library(tidyverse)
+library(kableExtra)
+# Read the CSV file
+indep_var <- fread("/dados/pessoal/francisco/custo_oportunidade_terra/table/independente_var_table.csv")
+
+# kbl(indep_var[,c(1,2,5)], caption = "Potencias variáveis preditoras para  o modelo preditivo de valor da terra nua.",booktabs = T) %>%
+#  kable_styling(full_width = T) 
+
+DT::datatable(
+  indep_var[,c(1,2,5)],
+  fillContainer = FALSE, 
+  options = list( scrollY = "200px",
+                  pageLength = 23,
+                  dom = "ti")
+)
+
+
+```
+
+---
+# Metodologia Proposta
+- Ajustar uma regressão entre VTN e as variáveis preditoras adequadas, de forma segmentada: Pensando no território brasileiro, um modelo para cada região (centro-oeste, sul, norte...);
+- A partir das regressões, extrapolar os valores de VTN predito para todas as células da grade de cada região;
+- Recortar para a região de interesse (por exemplo, bioma Mata Atlântica)
+
+```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="45%",fig.align='center', fig.cap="Exemplo do resultado da extrapolação com valores preditos de VTN a partir de modelos regionais."}
+
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/regional_VTN.jpeg")
+
+```
+
+---
+# Proximos passos
+
+- Acordar a metodologia;
+- Criar o banco de dados de VTN;
+- Levantar na literatura variáveis preditoras adequadas;
+- Calcular as variaveis preditoras e espacializar todas as camadas;
+- Ajustar uma primeira versão dos modelos;
+- Analisar a acurácia dos modelos;
+- Validar os resultados com modelos similares disponíveis;
