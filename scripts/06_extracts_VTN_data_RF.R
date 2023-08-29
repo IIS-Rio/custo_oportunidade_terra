@@ -20,7 +20,7 @@ library(stringi)
 
 # anos com dados disponiceis
 
-anos <- c(2019:2022)
+anos <- c(2019:2023)
 
 # 2022 o padrao da url eh diferente
 
@@ -28,17 +28,27 @@ anos <- c(2019:2022)
 
 url19_21 <- paste0("https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn/vtn",anos,"/@@download/file/vtn-",anos,".pdf")
 
-url <- "https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn/valores-terra-nua-2022.pdf/@@download/file/Tabela%20VTN%202022.pdf"
+url_22 <- "https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn/valores-terra-nua-2022.pdf/"
+
+url_23 <- paste0("https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn/tabela-vtn-",anos[c(4,5)],".pdf")
 
 # pasta pra salvar os pdfs
-dest <- "data"
+
+dest <- "/dados/projetos_andamento/custo_oportunidade/data"
 
 dir.create(dest)
 
 # baixando os dados
 
-download.file(url = url,destfile = file.path(dest,"VTN_",anos,".pdf"),mode = "wb")
 
+f <- function(url, dest_folder, year) {
+  dest_path <- file.path(dest_folder, paste0("VTN_", year, ".pdf"))
+  download.file(url = url, destfile = dest_path, mode = "wb")
+}
+
+f(url_22, dest, "2022")
+
+# aplicar pros demais anos!
 
 download.file(url = url19_21,destfile = paste0(dest,"/VTN_",anos,".pdf")
                                                ,mode = "wb")
@@ -54,11 +64,14 @@ download.file(url = url19_21,destfile = paste0(dest,"/VTN_",anos,".pdf")
 
 # funcao pra estados que tem vtn unico (pra 2020 nao esta funcionando)
 
-get_table <- function(raw,ano) {
+
+get_table_unique_val <- function(raw,ano) {
   
   raw <- map(raw,~str_split(.x,"\\n") %>%unlist())
   raw <- reduce(raw,c)
-  
+  # ano mais recente 2023 nao tem estado com valor unico
+   
+  if(ano==2023){data.table=NA}
   if (ano == 2022|ano==2021) {
     # define a pagina de inicio e de fim dos dados (grep tb funcionaria)
     table_start <- stringr::str_which(tolower(raw),"alvaraes")
@@ -99,10 +112,84 @@ get_table <- function(raw,ano) {
 # funcao pra estados que tem vtn discriminado por uso
 # falta 2020, q nao da certo tb
 
-get_table2 <- function(raw) {
+get_table <- function(raw) {
   
   raw <- map(raw,~str_split(.x,"\\n") %>%unlist())
   raw <- reduce(raw,c)
+  if (ano == 2023) {
+   # define a pagina de inicio e de fim dos dados 
+   start_index <- grep("baianopolis", tolower(raw))
+   end_index <- grep("tupiratins", tolower(raw))
+   # build the table and remove special characters
+   table <- raw[start_index:end_index]
+   table <- gsub("\\s+", " ", table)  # Remove excessive whitespace
+   table <- gsub("[^[:print:]]", " ", table)  # Remove non-printable characters
+   #table <- gsub("\\s{2,}", "|", table)  # Replace multiple spaces with |
+   table <- trimws(table)  # Trim whitespace
+   # Convert the processed text into a data.table
+   data.table <- strsplit(table, "\n")
+   data.table <- data.frame(do.call(rbind, data.table), stringsAsFactors = FALSE)
+   #tirar linha com CEARÁ - CE, unica com UF que ficou
+   # data.table <- data.table%>%
+   #   filter(across(1)!="CEARÁ - CE")
+   # adicionando lista vazia
+   # falta fazer algo pra lidar com oq eh UF e tirar as linhas com cabeçalho!
+   list_values <- list()
+   for(linha in 1:nrow(data.table)){
+      # Split text based on "R$" and ignore uppercase strings, also using "s/informacao. Adicionei tb um negocio com lacuna em branco, mas cria mtas colunas, rever!(|\\s+)
+      split_text <- unlist(strsplit(data.table[linha,], "(?<![A-Z])R\\$\\s|s/informação", perl = TRUE))
+       # Remove empty elements
+      split_text <- split_text[split_text != ""]
+       # aqui adicionar condicao pra se for UF 
+      if(length(split_text)==1){
+        data_frame <- data.frame(col1=split_text)
+        # Add six additional columns with NA values
+        data_frame <- data_frame %>%
+          mutate(col2 = NA,
+                 col3 = NA,
+                 col4 = NA,
+                 col5 = NA,
+                 col6 = NA,
+                 col7 = NA,
+                 col8=NA)
+        
+        colnames(data_frame) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+        
+        list_values[[linha]] <- data_frame
+        }else{
+       # # Convert the last element to a numeric value (1 in this case)
+       # last_element <- as.numeric(sub(".*\\s(\\d+\\.?\\d*)$", "\\1", split_text[length(split_text)]))
+       # split the last elements
+      last <- strsplit(x = split_text[length(split_text)],split = " ")
+       # Create a data frame from the split text
+       # Extract the values from the split_text
+      value1 <- last[[1]][1]
+      value1 <- gsub("\\.", "#temp#", value1)  # Replace "." with a temporary marker
+      value1 <- gsub(",", ".", value1)     # Replace "," with "."
+      value1 <- gsub("#temp#", ",", value1)  # Replace temporary marker with ","
+      value1 <- sub("^,", "0,", value1)     # Add "0" before comma if it's at the beginning
+      value2 <- as.numeric(gsub(",", "", last[[1]][2]))
+      df <- data.frame(Column1 = value1, Column2 = value2)
+       # Remove the last element from the split_text
+      split_text <- split_text[-length(split_text)]
+      converted_text <- gsub("\\.", "#temp#", split_text)  # Replace "." with a temporary marker
+      converted_text <- gsub(",", ".", converted_text)     # Replace "," with "."
+      converted_text <- gsub("#temp#", ",", converted_text)  # Replace temporary marker with ","
+      converted_text <- sub("^,", "0,", converted_text)     # Add "0" before comma if it's at the beginning
+      data_frame <- data.frame(matrix(converted_text, ncol = length(converted_text), byrow = TRUE))
+        # Add the last numeric elements as a new column
+    data_frame <- cbind(data_frame,df)
+    colnames(data_frame) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+     
+    
+    list_values[[linha]] <- data_frame 
+    
+    }
+   
+   
+   }
+   data.table =  do.call(list_values,rbind)
+   }
   if (ano == 2022){
     table_start <- stringr::str_which(tolower(raw),"alcobaca")
     table_end <- stringr::str_which(tolower(raw),"tupiratins")
@@ -199,9 +286,6 @@ get_table2 <- function(raw) {
   data.table
 }
 
-
-#anos <- c(2019,2020,2021,2022)
-
 UFs_valor_unico <- c("CEARA - CE","CEARA - CE","AMAZONAS - AM","AMAZONAS - AM") 
 
 contador <- 1
@@ -216,16 +300,19 @@ for(ano in anos){
   
   txt <- pdf_text(pdf =paste0("data/VTN_",ano,"_converted.pdf"))
   
-  }else{txt <- pdf_text(pdf =paste0("data/VTN_",ano,".pdf"))}
-  #raw_text <- map("data/VTN_2022.pdf", txt)
+  }else{txt <- pdf_text(pdf =paste0(dest,"/VTN_",ano,".pdf"))}
   
-  df_vtn_unico <- get_table(raw = txt,ano = ano)
+  # pra 2023 nao tem valor unico logo deve gerar NA
+  df_vtn_unico <- tryCatch(
+    get_table_unique_val(raw = txt, ano = ano),
+    error = function(e) {
+      message("An error occurred: ", conditionMessage(e))
+      NA
+    }
+  )
   
   #names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
-  
-  df_vtn_unico$UF <- UFs_valor_unico[contador]
-  
-  df_vtn_aptidao <- get_table2(raw = txt)
+  df_vtn_aptidao <- get_table(raw = txt)
   
   # adicionar uf - 2019 nao tem Amazonas - checar se 2020 tem!!
   
