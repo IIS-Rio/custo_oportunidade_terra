@@ -110,7 +110,6 @@ get_table_unique_val <- function(raw,ano) {
 
 
 # funcao pra estados que tem vtn discriminado por uso
-# falta 2020, q nao da certo tb
 
 get_table <- function(raw) {
   
@@ -122,12 +121,12 @@ get_table <- function(raw) {
    end_index <- grep("tupiratins", tolower(raw))
    # build the table and remove special characters
    table <- raw[start_index:end_index]
-   table <- gsub("\\s+", " ", table)  # Remove excessive whitespace
-   table <- gsub("[^[:print:]]", " ", table)  # Remove non-printable characters
-   #table <- gsub("\\s{2,}", "|", table)  # Replace multiple spaces with |
+   #table <- gsub("\\s+", " ", table)  # Remove excessive whitespace
+   #table <- gsub("[^[:print:]]", " ", table)  # Remove non-printable characters
    table <- trimws(table)  # Trim whitespace
+   #table <-  gsub("(?<![A-Z])\\s{1,}", "|", table, perl = TRUE)  # Replace multiple spaces with |
    # Convert the processed text into a data.table
-   data.table <- strsplit(table, "\n")
+   data.table <- strsplit(table, "\n")# era \n
    data.table <- data.frame(do.call(rbind, data.table), stringsAsFactors = FALSE)
    #tirar linha com CEARÁ - CE, unica com UF que ficou
    # data.table <- data.table%>%
@@ -136,13 +135,13 @@ get_table <- function(raw) {
    # falta fazer algo pra lidar com oq eh UF e tirar as linhas com cabeçalho!
    list_values <- list()
    for(linha in 1:nrow(data.table)){
-      # Split text based on "R$" and ignore uppercase strings, also using "s/informacao. Adicionei tb um negocio com lacuna em branco, mas cria mtas colunas, rever!(|\\s+)
-      split_text <- unlist(strsplit(data.table[linha,], "(?<![A-Z])R\\$\\s|s/informação", perl = TRUE))
+      # Split text based on "R$" and ignore uppercase strings, also using "s/informacao. mais cria coluna em branco qndo tem mto espacamentos{20,}
+      split_text <- unlist(strsplit(data.table[linha,], "(?<![A-Z])R\\$\\s|s/informação|\\s{36,}", perl = TRUE))
        # Remove empty elements
-      split_text <- split_text[split_text != ""]
+      #split_text <- split_text[split_text != ""]
        # aqui adicionar condicao pra se for UF 
-      if(length(split_text)==1){
-        data_frame <- data.frame(col1=split_text)
+      if(length(split_text)<=2){
+        data_frame <- data.frame(col1=paste(split_text,collapse = " "),stringsAsFactors = FALSE)
         # Add six additional columns with NA values
         data_frame <- data_frame %>%
           mutate(col2 = NA,
@@ -159,27 +158,47 @@ get_table <- function(raw) {
         }else{
        # # Convert the last element to a numeric value (1 in this case)
        # last_element <- as.numeric(sub(".*\\s(\\d+\\.?\\d*)$", "\\1", split_text[length(split_text)]))
-       # split the last elements
-      last <- strsplit(x = split_text[length(split_text)],split = " ")
+          # split the last elements
+          x= gsub("\\s+", " ", split_text)    
+          last <-unlist( strsplit(x = x[length(x)],split = "\\s"))
+          # keep only non-empty
+          #last <- last[nzchar(last)]
        # Create a data frame from the split text
        # Extract the values from the split_text
-      value1 <- last[[1]][1]
-      value1 <- gsub("\\.", "#temp#", value1)  # Replace "." with a temporary marker
-      value1 <- gsub(",", ".", value1)     # Replace "," with "."
-      value1 <- gsub("#temp#", ",", value1)  # Replace temporary marker with ","
-      value1 <- sub("^,", "0,", value1)     # Add "0" before comma if it's at the beginning
-      value2 <- as.numeric(gsub(",", "", last[[1]][2]))
-      df <- data.frame(Column1 = value1, Column2 = value2)
+          value1 <- last[[1]][1]
+          value1 <- gsub("\\.", "#temp#", value1)  # Replace "." with a temporary marker
+          value1 <- gsub(",", ".", value1)     # Replace "," with "."
+          value1 <- gsub("#temp#", ",", value1)  # Replace temporary marker with ","
+          value1 <- sub("^,", "0,", value1)     # Add "0" before comma if it's at the beginning
+          
+          value2 <- tryCatch({
+            element <- last[[2]][1]
+            cleaned_element <- gsub("\\s+", " ", element)
+            numeric_value <- as.numeric(gsub(",", "", cleaned_element))
+            numeric_value
+          }, error = function(e) NA)
+          df <- data.frame(Column1 = value1, Column2 = value2)
        # Remove the last element from the split_text
-      split_text <- split_text[-length(split_text)]
-      converted_text <- gsub("\\.", "#temp#", split_text)  # Replace "." with a temporary marker
-      converted_text <- gsub(",", ".", converted_text)     # Replace "," with "."
-      converted_text <- gsub("#temp#", ",", converted_text)  # Replace temporary marker with ","
-      converted_text <- sub("^,", "0,", converted_text)     # Add "0" before comma if it's at the beginning
-      data_frame <- data.frame(matrix(converted_text, ncol = length(converted_text), byrow = TRUE))
-        # Add the last numeric elements as a new column
-    data_frame <- cbind(data_frame,df)
-    colnames(data_frame) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
+          split_text <- split_text[-length(split_text)]
+          converted_text <- gsub("\\.", "#temp#", split_text)  # Replace "." with a temporary marker
+          converted_text <- gsub(",", ".", converted_text)     # Replace "," with "."
+          converted_text <- gsub("#temp#", ",", converted_text)  # Replace temporary marker with ","
+          converted_text <- sub("^,", "0,", converted_text)     # Add "0" before comma if it's at the beginning
+          #data_frame <- data.frame(matrix(converted_text, ncol = length(converted_text), byrow = TRUE))
+          cleaned_vector <- gsub("\\s", "", converted_text)
+          # Split the chr_vector into individual elements
+          split_result <- strsplit(cleaned_vector, split = "\\s", perl = TRUE)
+          # Convert character(0) to NA
+          split_result[sapply(split_result, length) == 0] <- NA
+          # Unlist the split result
+          unlisted_result <- unlist(split_result)
+          # Convert the unlisted result into a matrix
+          matrix_result <- matrix(unlisted_result, ncol = 6, byrow = TRUE)
+          # Convert the matrix into a data frame
+          data_frame <- as.data.frame(matrix_result)
+          # Add the last numeric elements as a new column
+          data_frame <- cbind(data_frame,df)
+          colnames(data_frame) <- c("Nome Município","Lavoura Aptidão Boa","Lavoura Aptidão Regular","Lavoura Aptidão Restrita","Pastagem Plantada","Silvicultura ou pastagem Natural","Preservação","Fonte")
      
     
     list_values[[linha]] <- data_frame 
@@ -188,7 +207,14 @@ get_table <- function(raw) {
    
    
    }
-   data.table =  do.call(list_values,rbind)
+   final_table =  do.call(rbind,list_values)
+   #filtrando colunas inuteis
+   # Extract values from rows 12, 13, and 14 in the first column
+   values_to_exclude <- final_table[c(12, 13, 14), 1]
+   # Filtering rows based on conditions
+   filtered_table <- final_table %>%
+     filter(!(.[, 1] %in% values_to_exclude))
+   data.table = filtered_table
    }
   if (ano == 2022){
     table_start <- stringr::str_which(tolower(raw),"alcobaca")
@@ -302,7 +328,7 @@ for(ano in anos){
   
   }else{txt <- pdf_text(pdf =paste0(dest,"/VTN_",ano,".pdf"))}
   
-  # pra 2023 nao tem valor unico logo deve gerar NA
+  # pra 2023 nao tem valor unico logo deve gerar NA. mas ta calculando, corrigir!
   df_vtn_unico <- tryCatch(
     get_table_unique_val(raw = txt, ano = ano),
     error = function(e) {
@@ -311,19 +337,21 @@ for(ano in anos){
     }
   )
   
-  #names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
-  df_vtn_aptidao <- get_table(raw = txt)
+#names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
   
-  # adicionar uf - 2019 nao tem Amazonas - checar se 2020 tem!!
+df_vtn_aptidao <- get_table(raw = txt)
   
-  ufs <- df_vtn_aptidao %>%
-    # coluna 3 sempre vazia qndo a 1 = UF
-    filter_at(c(1,3),all_vars(.==""))%>%
-    #selecionar apenas coluna com UF
-    select_at(2)%>%
-    rename_with(.cols = 1, ~"uf")
+# adicionar uf - 2019 nao tem Amazonas - checar se 2020 tem!!
+# isso funcionava ate 2022. 2023 deve ser diferente
+# continuar, pra fazer funcionar pra 2023!  
+ufs <- df_vtn_aptidao %>%
+  # coluna 3 sempre vazia qndo a 1 = UF
+  filter_at(c(1,3),all_vars(.==""))%>%
+  #selecionar apenas coluna com UF
+  select_at(2)%>%
+  rename_with(.cols = 1, ~"uf")
   
-  ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
+ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
     
   # loop enquanto uf == uf, name it, when it changes, go to next one
   
