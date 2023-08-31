@@ -12,51 +12,13 @@ library(readr)
 library(stringi)
 #-------------------------------------------------------------------------------
 
-
-################################################################################
-# baixando tabela de dados
-################################################################################
-
-
 # anos com dados disponiceis
 
 anos <- c(2019:2023)
 
-# 2022 o padrao da url eh diferente
-
-# 2021-2019
-
-url19_21 <- paste0("https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn/vtn",anos,"/@@download/file/vtn-",anos,".pdf")
-
-url_22 <- "https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn/valores-terra-nua-2022.pdf/"
-
-url_23 <- paste0("https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn/tabela-vtn-",anos[c(4,5)],".pdf")
-
-# pasta pra salvar os pdfs
+# pasta com os pdfs salvos
 
 dest <- "/dados/projetos_andamento/custo_oportunidade/data"
-
-dir.create(dest)
-
-# baixando os dados
-
-
-f <- function(url, dest_folder, year) {
-  dest_path <- file.path(dest_folder, paste0("VTN_", year, ".pdf"))
-  download.file(url = url, destfile = dest_path, mode = "wb")
-}
-
-f(url_22, dest, "2022")
-
-# aplicar pros demais anos!
-
-download.file(url = url19_21,destfile = paste0(dest,"/VTN_",anos,".pdf")
-                                               ,mode = "wb")
-
-# OBS:
-
-# o pdf de 2020 tem q ser convertido no I love pdf pra um arquivo selecionavel!
-
 
 ################################################################################
 #lendo pdf e transformando em data frame
@@ -85,13 +47,13 @@ get_table_unique_val <- function(raw,ano) {
       table_start <- stringr::str_which(tolower(raw),i)
       table_end <- stringr::str_which(tolower(raw),f)
     }
-  else{
-    # pdf 2020 nao reconhece caracteres especiasi, tem q tirar
-    i="abaiara"
-    f = "vicosa do ceara"
-    remove_latin <- function(x)stri_trans_general(str = x,id = "Latin-ASCII")
-    table_start <- stringr::str_which(tolower(raw),i)
-    table_end <- stringr::str_which(tolower(remove_latin(raw)),f)
+    if(ano == 2020){
+      # pdf 2020 nao reconhece caracteres especiasi, tem q tirar
+      i="abaiara"
+      f = "vicosa do ceara"
+      remove_latin <- function(x)stri_trans_general(str = x,id = "Latin-ASCII")
+      table_start <- stringr::str_which(tolower(raw),i)
+      table_end <- stringr::str_which(tolower(remove_latin(raw)),f)
     }
    }
   
@@ -210,10 +172,12 @@ get_table <- function(raw) {
    final_table =  do.call(rbind,list_values)
    #filtrando colunas inuteis
    # Extract values from rows 12, 13, and 14 in the first column
-   values_to_exclude <- final_table[c(12, 13, 14), 1]
+   values_to_exclude <- gsub(pattern = " ",replacement = "",x = final_table[c(12, 13, 14), 1])
    # Filtering rows based on conditions
    filtered_table <- final_table %>%
-     filter(!(.[, 1] %in% values_to_exclude))
+     # eliminando espacos pro filtro funcionas
+     mutate(across(1, ~ gsub(pattern = " ", replacement = "", x = .)))%>%  
+      filter(!(.[, 1] %in% values_to_exclude))
    data.table = filtered_table
    }
   if (ano == 2022){
@@ -318,7 +282,12 @@ contador <- 1
 
 # funcao converte caracteres em pt pra formato ingles
 
-f <- function(x)parse_number(x,locale = locale(decimal_mark = ",", grouping_mark = "."))
+# pra todos os anos menos 2023
+f2 <- function(x)parse_number(x,locale = locale(decimal_mark = ",", grouping_mark = "."))
+# pra 2023
+f3 <- function(x)parse_number(x,locale = locale(decimal_mark = ".", grouping_mark = ","))
+
+# extraindo os dados de todos os pdfs
 
 for(ano in anos){
 
@@ -328,7 +297,7 @@ for(ano in anos){
   
   }else{txt <- pdf_text(pdf =paste0(dest,"/VTN_",ano,".pdf"))}
   
-  # pra 2023 nao tem valor unico logo deve gerar NA. mas ta calculando, corrigir!
+  # pra 2023 nao tem valor unico logo deve gerar NA
   df_vtn_unico <- tryCatch(
     get_table_unique_val(raw = txt, ano = ano),
     error = function(e) {
@@ -337,21 +306,42 @@ for(ano in anos){
     }
   )
   
-#names(df_vtn_unico) <- c("Nome Municipio","obs","VTN")
+  df_vtn_aptidao <- get_table(raw = txt)
+    
+  # extraindo UFs pra adicionar na planilha 
+  # ufs <- df_vtn_aptidao %>%
+  #   # coluna 3 sempre vazia qndo a 1 = UF. adicionando if_else
+  #   filter_at(c(1,3),all_vars(.==""))%>%
+  #   #selecionar apenas coluna com UF
+  #   select_at(2)%>%
+  #   rename_with(.cols = 1, ~"uf")
   
-df_vtn_aptidao <- get_table(raw = txt)
-  
-# adicionar uf - 2019 nao tem Amazonas - checar se 2020 tem!!
-# isso funcionava ate 2022. 2023 deve ser diferente
-# continuar, pra fazer funcionar pra 2023!  
-ufs <- df_vtn_aptidao %>%
-  # coluna 3 sempre vazia qndo a 1 = UF
-  filter_at(c(1,3),all_vars(.==""))%>%
-  #selecionar apenas coluna com UF
-  select_at(2)%>%
-  rename_with(.cols = 1, ~"uf")
-  
-ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
+  # funcao que faz isso
+  UFs_f <- function(data, year) {
+    if(ano==2023){
+      filtered_data <- data %>%
+        filter(across(2:7, ~ is.na(.)))%>%
+        select_at(1)%>%
+        rename_with(.cols = 1, ~"uf")
+    
+    }else{
+      
+      filtered_data <- data %>%
+        # coluna 3 sempre vazia qndo a 1 = UF. adicionando if_else
+        filter_at(c(1,3),all_vars(.==""))%>%
+        #selecionar apenas coluna com UF
+        select_at(2)%>%
+        rename_with(.cols = 1, ~"uf")
+      
+    }
+    
+    return(filtered_data)
+  }
+
+
+  ufs <- UFs_f(data = df_vtn_aptidao,year = ano)
+
+  ufs <- rbind(data.frame(uf="BAHIA-BA"),ufs)
     
   # loop enquanto uf == uf, name it, when it changes, go to next one
   
@@ -359,22 +349,16 @@ ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
   
   df <- df_vtn_aptidao
   
-  # testando adicionar um outro if aqui, pra 2021,22 x 2019
+  
   if(ano==2021){
     uf <- ufs$uf
-    uf2 <- uf[2:19]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!
+    uf2 <- uf[2:19]# sem bahia 
     # repete tocantins
     uf2[19] <- uf2[18]
   }
-  if(ano==2022){
+  if(ano==2022|ano==2023|ano==2020){
     uf <- ufs$uf
-    uf2 <- uf[2:18]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!
-    # repete tocantins
-    uf2[18] <- uf2[17]
-  }
-  if(ano==2020){
-    uf <- ufs$uf
-    uf2 <- uf[2:18]# sem bahia - aqui faz diferenca se eh 2019 ou o resto!
+    uf2 <- uf[2:18]# sem bahia 
     # repete tocantins
     uf2[18] <- uf2[17]
   }
@@ -384,16 +368,35 @@ ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
     # repete tocantins
     uf2[17] <- uf2[16]
   }
-  for (i in 1:nrow(df)) {
-    if (df[i, 2] !=uf2[j]) {
-      df[i, "uf"] <- uf[j]
-      
-    } else {
-      j <- j + 1
-      df[i, "uf"] <- uf[j]
-      
+  
+  if(ano!=2023){
+    for (i in 1:nrow(df)) {
+      if (df[i, 2] !=uf2[j]) {
+        df[i, "uf"] <- uf[j]
+        
+      } else {
+        j <- j + 1
+        df[i, "uf"] <- uf[j]
+        
+      }
     }
-  }
+    
+  }else{
+    
+    for (i in 1:nrow(df)) {
+      if (df[i, 1] !=uf2[j]) {
+        df[i, "uf"] <- uf[j]
+        
+      } else {
+        j <- j + 1
+        df[i, "uf"] <- uf[j]
+        
+      }
+    }
+      
+    
+    
+    }
   
   # limpando dados eliminando linhas sem informação
   
@@ -405,35 +408,41 @@ ufs <- rbind(data.frame(uf="BAHIA - BA"),ufs)
   
   # padronizando numero de colunas
   
-  df_nulo <- matrix(nrow = nrow(df_vtn_unico),ncol = 5)
-  
-  # criando outro df pra evitar numero grande de linhas ao rodar de novo
-  
-  df_vtn_unico_2 <- cbind(df_vtn_unico,df_nulo)
-  
-  # padronizando nome das colunas pra juntar num df unico
-  names(df_vtn_unico_2)[3] <- "VTN_unico"
-  names(df_vtn_unico_2)[c(6:10)] <-names(df_vtn_aptidao_filter)[c(2:6)] 
-  
-  df_vtn_aptidao_filter$VTN_unico <- NA
-  
-  names(df_vtn_aptidao_filter)[9] <- "UF"
-  
-  df_vtn_unico_2$Preservação <- NA
-  # eliminando coluna com obs
-  df_vtn_unico_2 <-df_vtn_unico_2 [,-2]
+ if(ano!=2023){
+    df_nulo <- matrix(nrow = nrow(df_vtn_unico),ncol = 5)
+    
+    # criando outro df pra evitar numero grande de linhas ao rodar de novo
+    
+    df_vtn_unico_2 <- cbind(df_vtn_unico,df_nulo)
+    
+    # padronizando nome das colunas pra juntar num df unico
+    names(df_vtn_unico_2)[3] <- "VTN_unico"
+    names(df_vtn_unico_2)[c(6:10)] <-names(df_vtn_aptidao_filter)[c(2:6)] 
+    
+    df_vtn_aptidao_filter$VTN_unico <- NA
+    
+    names(df_vtn_aptidao_filter)[9] <- "UF"
+    
+    df_vtn_unico_2$Preservação <- NA
+    # eliminando coluna com obs
+    df_vtn_unico_2 <-df_vtn_unico_2 [,-2]
   
   df_unificado <- rbind(df_vtn_unico_2,df_vtn_aptidao_filter)
-  
   # tem q converter pra valor
+  df_unificado2 <- df_unificado %>% mutate_at(c(2,5:10), f2)
+  }else{
+    df_unificado=df
+    df_unificado$VTN_unico
+    # tem q converter pra valor
+    df_unificado2 <- df_unificado %>% mutate_at(c(2:7), f3)
+    }
   
-  df_unificado2 <- df_unificado %>% mutate_at(c(2,5:10), f)
+  
   
   # salvando
   
-  write.csv(df_unificado2,paste0("data/VTN_RF_",ano,".csv"),row.names = F)
+  write.csv(df_unificado2,paste0(dest,"/VTN_RF_",ano,".csv"),row.names = F)
   contador <- contador+1
 }
 
-# nao ta rolando pra 2022 agora, parece q 2022 tem 1 estado a menos q 2021.  corrigir isso separando a parte q agrega uf!
 
