@@ -26,6 +26,10 @@ mun_pj <- st_read("/dados/projetos_andamento/custo_oportunidade/mun_data/Brazil_
 
 # usando planilha com NAs preenchidos
 
+VTN_2023 <- read.csv("/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_2023_NA_filled.csv") %>%
+  # esse nao tem coluna VTN unico, esqueci de adicionar antes!
+  mutate(VTN_unico=NA)
+
 VTN_2022 <- read.csv("/dados/pessoal/francisco/custo_oportunidade_terra/mun_VTN/mun_VTN_2022_NA_filled.csv")
 
 VTN_complementar <- read.csv("/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_RF_2019_20_complementares_NA_filled.csv")
@@ -68,6 +72,10 @@ nat_veg <- rasters[[2]] + rasters[[3]] + rasters[[5]]+rasters[[8]]
 # definir aqui o alvo (VTN_2022 ou VTN_complementar)
 
 VTN <- VTN_complementar # tem que mudar aqui, mas o ideal eh mudar na funcao direto!! fazer isso!
+
+# coluna com codigo municipio tem que ser code_muni
+
+#names(VTN)[11] <- "code_muni" # 11 pra 2023!
 
 spatial_VTN5 <- function(lu, lista_cod_IBGE,n_cores) {
   
@@ -220,46 +228,82 @@ pastagem_mos <- mosaic_f(list_solutions = spatial_pastagem,x = 1,y = length(spat
 
 plot(pastagem_mos)
 
-writeRaster(pastagem_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_pastureland_2022.tif",overwrite=TRUE)
+writeRaster(pastagem_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2023/VTN_pastureland_2023.tif",overwrite=TRUE)
+
+
+writeRaster(pastagem_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2023/VTN_pastureland_2022.tif",overwrite=TRUE)
 
 writeRaster(pastagem_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2019_2021/VTN_pastureland_2019_2021.tif",overwrite=TRUE)
-
-
 
 rm(spatial_pastagem,pastagem_mos)
 
 # rodando pra lavoura
 
-spatial_lavoura <- spatial_VTN5(lu = "lavoura",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
+spatial_lavoura <- spatial_VTN5(lu = "lavoura",lista_cod_IBGE = VTN$code_muni,n_cores = 20)
 
 spatial_lavoura <- unlist(spatial_lavoura)
 
 lavoura_mos <- mosaic_f(list_solutions = spatial_lavoura,x = 1,y = length(spatial_lavoura))
 
+plot(lavoura_mos)
+
+# 2023
+
+writeRaster(lavoura_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2023/VTN_cropland_2023.tif",overwrite=TRUE)
+
+# 2022
+
 writeRaster(lavoura_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_cropland_2022.tif",overwrite=TRUE)
+
+# complementar
+
+writeRaster(lavoura_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2019_2021/VTN_cropland_2019_2021.tif",overwrite=TRUE)
+
 
 rm(spatial_lavoura,lavoura_mos)
 
 # rodando pra silvicultura
 
-spatial_silvicultura <- spatial_VTN5(lu = "silvicultura",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
+spatial_silvicultura <- spatial_VTN5(lu = "silvicultura",lista_cod_IBGE = VTN$code_muni,n_cores = 20)
 
 spatial_silvicultura <- unlist(spatial_silvicultura)
 
 silvicultura_mos <- mosaic_f(list_solutions = spatial_silvicultura,x = 1,y = length(spatial_silvicultura))
 
+
+
+# 2023 
+writeRaster(silvicultura_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2023/VTN_silviculture_2023.tif",overwrite=TRUE)
+
+# 2022
+
 writeRaster(silvicultura_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_silviculture_2022.tif",overwrite=TRUE)
+
+# complementar
+
+writeRaster(silvicultura_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2019_2021/VTN_silviculture_2019_2021.tif",overwrite=TRUE)
+
 
 rm(spatial_silvicultura,silvicultura_mos)
 
 # rodando pra floresta
 
-spatial_forest <- spatial_VTN5(lu = "preservacao",lista_cod_IBGE = VTN_2022$code_muni,n_cores = 15)
+spatial_forest <- spatial_VTN5(lu = "preservacao",lista_cod_IBGE = VTN$code_muni,n_cores = 20)
 
 spatial_forest <- unlist(spatial_forest)
 
 forest_mos <- mosaic_f(list_solutions = spatial_forest,x = 1,y = length(spatial_forest))
 
+
+# 2023 
+
+writeRaster(forest_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2023/VTN_natural_veg_2023.tif",overwrite=TRUE)
+
+# 2022
 writeRaster(forest_mos,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_natural_veg_2022.tif",overwrite=TRUE)
+
+# complementar
+
+writeRaster(forest_mos,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2019_2021/VTN_natural_veg_2019_2021.tif",overwrite=TRUE)
 
 rm(spatial_forest,forest_mos)

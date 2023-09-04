@@ -1,4 +1,5 @@
 #- OBS -------------------------------------------------------------------------
+
 # alguns municipios tem dados incompletos. Esse script completa os Nas com dados relevantes. 
 
 #Pra lavoura nao precisa, pois a funcao de espacializacao ja resolve o problema.
@@ -8,10 +9,17 @@
 #-------------------------------------------------------------------------------
 
 #- pacotes ---------------------------------------------------------------------
+
 library(tidyverse)
+
 #-------------------------------------------------------------------------------
 
 # abrindo csv com dados de VTN por municipio
+
+library(readr)
+
+VTN_2023 <- read.csv("/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_RF_2023.csv")
+
 
 VTN_2022 <- read.csv("/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_2022.csv")
 
@@ -22,6 +30,12 @@ vtns_complementar <- read.csv("/dados/projetos_andamento/custo_oportunidade/mun_
 # tem uma serie de questoes nesses mun complementares com valores tipo 1 e 2, ou ate 0.1. Todos tem q ser substituidos pela media da categoria no estado. 
 
 # tem alguns municios repetidos
+
+# 2023
+
+repet <- VTN_2023[duplicated(VTN_2023$code_mn),]#0
+
+# 2022
 
 repet <- VTN_2022[duplicated(VTN_2022$code_muni),]
 
@@ -37,7 +51,10 @@ col<- names(VTN_2022_filt)[8:10]
 # aqui define o df alvo (2022 ou os dados complementares de 2021 e 2019)
 # da pra fazer via loop uma proxima
 
-VTN_df <- vtns_complementar # aqui defini q sao os dados complementares(poderia ser o VTN_2022_filt)
+VTN_df <- VTN_2023 # aqui defini q sao os dados complementares(poderia ser o VTN_2022_filt,vtns_complementar etc)
+# padronizando nome coluna de 2023
+
+names(VTN_df)[14] <- "abbrev_state" 
 
 media_pastagem <- VTN_df%>%
   # exclui valores errados
@@ -71,6 +88,11 @@ media_lavoura_aptidao_regular <- VTN_df%>%
   group_by(abbrev_state)%>%
   summarise(Lavoura.Aptidão.Regular_media=mean(Lavoura.Aptidão.Regular,na.rm=T))
 
+media_lavoura_aptidao_boa <- VTN_df%>%
+  # exclui valores errados
+  filter(Lavoura.Aptidão.Boa>10)%>%
+  group_by(abbrev_state)%>%
+  summarise(Lavoura.Aptidão.Boa_media=mean(Lavoura.Aptidão.Boa,na.rm=T))
 
 #---- pastagem ----------------------------------------------------------------
 
@@ -82,7 +104,7 @@ media_lavoura_aptidao_regular <- VTN_df%>%
 pastagem_lista <- list()
 UFs <- unique(VTN_df$abbrev_state)
 
-for (i in UFs){ # tira cearea q tem valor unico
+for (i in UFs){ 
   VTN_df_s <- filter(VTN_df,abbrev_state==i)
   # pra cada UF, roda todas as linhas e substitui pastagem plantada por silvicultura qndo nao tem valor
   for (j in 1:nrow(VTN_df_s)){
@@ -187,12 +209,15 @@ for (i in unique(df_silvicultura$abbrev_state)){
 
 df_preservacao <- do.call(rbind,preservacao_lista)
 
-#---- lavoura media e regular----------------------------------------------------
-# apenas valores 1,2. Os nas sao corrigidos na espacializacao
+summary(df_preservacao$Preservação)
+summary(VTN_df$Preservação)
 
+#---- lavoura media, regular e boa ----------------------------------------------
+# tira valores bizarros tipo 1, 2, 0.1, 0.2.
+# obs, pros vtns complementares, precisa tirar ceara da lista de ufs!
 lavoura_media_lista <- list()
 
-for (i in UFs[-1]){
+for (i in UFs){
   
   # filtra por UF
   df_lavoura_media_s <- filter(df_preservacao,abbrev_state==i)
@@ -216,7 +241,7 @@ df_lavoura_media <- do.call(rbind,lavoura_media_lista)
 
 lavoura_ruim_lista <- list()
 
-for (i in UFs[-1]){
+for (i in UFs){
   
   # filtra por UF
   df_lavoura_ruim_s <- filter(df_lavoura_media,abbrev_state==i)
@@ -238,13 +263,43 @@ for (i in UFs[-1]){
 
 df_lavoura_ruim <- do.call(rbind,lavoura_ruim_lista)
 
-# colocando de volta dados dos valores unicos
+
+lavoura_boa_lista <- list()
+
+for (i in UFs){
+  
+  # filtra por UF
+  df_lavoura_boa_s <- filter(df_lavoura_ruim,abbrev_state==i)
+  for (j in 1:nrow(df_lavoura_boa_s)){
+    # eliminar valores bizarros
+    if(is.na(df_lavoura_boa_s$Lavoura.Aptidão.Boa [j])){next}
+    if(df_lavoura_boa_s$Lavoura.Aptidão.Boa [j]<10){
+      
+      df_lavoura_boa_s$Lavoura.Aptidão.Boa[j] <- media_lavoura_aptidao_boa$Lavoura.Aptidão.Boa_media[media_lavoura_aptidao_boa$abbrev_state==i]
+      
+    }
+    
+  }
+  
+  # assign the modified data frame to the list
+  lavoura_boa_lista[[i]] <- df_lavoura_boa_s
+  
+}
+
+df_lavoura_boa <- do.call(rbind,lavoura_boa_lista)
+
+
+
+
+# colocando de volta dados dos valores unicos (pra 2023 nao precisa)
 
 # no caso dos dados complementares, UF==CE
 
 df_final <- rbind(df_lavoura_ruim,vtns_complementar[vtns_complementar$UF=="CEARA - CE",])
 
 # salvando planilha atualizada e sem NAs!
+
+write.csv(df_lavoura_boa,"/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_2023_NA_filled.csv",row.names = F)
 
 
 write.csv(df_preservacao,"/dados/projetos_andamento/custo_oportunidade/mun_VTN/mun_VTN_2022_NA_filled.csv",row.names = F)
