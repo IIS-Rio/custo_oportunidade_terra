@@ -3,7 +3,11 @@ library(raster)
 library(geobr)
 library(sf)
 
-l <- list.files("/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022",full.names = T)
+# listando rasters
+
+ano <- c("2019_2021","2022","2023") # indexar pra ano de interesse
+
+l <- list.files(paste0("/dados/projetos_andamento/custo_oportunidade/rasters_VTN/",ano[1]),full.names = T)
 
 VTNS_r <- lapply(l,raster)
 
@@ -11,18 +15,19 @@ VTNS_r <- lapply(l,raster)
 
 raster_stack <- stack(VTNS_r)
 
-maxValue(raster_stack[[1]])
-maxValue(raster_stack[[2]])
-maxValue(raster_stack[[3]])
-maxValue(raster_stack[[4]])
-
-plot(raster_stack[[1]]);plot(raster_stack[[4]])
+# maxValue(raster_stack[[1]])
+# maxValue(raster_stack[[2]])
+# maxValue(raster_stack[[3]])
+# maxValue(raster_stack[[4]])
+# 
+# plot(raster_stack[[1]]);plot(raster_stack[[4]])
 
 # nao da mais igual, mas parece q o raster de lu usado ta sendo o de lavoura!
-summary(raster_stack[[1]]-raster_stack[[4]])
+# summary(raster_stack[[1]]-raster_stack[[4]])
 
 
 # Sum the rasters, ignoring NAs
+
 sum_raster <- calc(raster_stack, sum, na.rm = TRUE)
 
 # tem q clipar pelo Br, pq a soma ignorando NA transforma NAs em 0
@@ -41,7 +46,15 @@ area_pixel_ha <- 980*1220/10^4
 
 VTN_ha <-sum_raster_m/area_pixel_ha
 
-writeRaster(VTN_ha,"/dados/pessoal/francisco/custo_oportunidade_terra/rasters_VTN/2022/VTN_ha_RF_agg_2022.tif")
+plot(VTN_ha)
+
+# 2023
+
+writeRaster(VTN_ha,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2023/VTN_ha_RF_agg_2023.tif")
+
+# 2019_21
+
+writeRaster(VTN_ha,"/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2019_2021/VTN_ha_RF_agg_2019_2021.tif")
 
 # brincando de plotar por enquanto
 
@@ -55,6 +68,7 @@ library(ggmap)
 
 
 # Create a data frame of the raster values
+
 df <- as.data.frame(VTN_ha, xy = TRUE)
 
 # Filter out rows with NA values and 0 values
@@ -68,16 +82,18 @@ log_transform <- function(x) {
 }
 
 
-library(ggpubr)
+library(ggpubr)# nao rola instalar
 
 gghistogram(log10(df_no0),x = "layer")
 summary(log10(df_no0$layer))
 summary(df_no0$layer)
 # falta tirar os NAs no 
 
-nrow(df[df$layer>513300,])/nrow(df)
+max(df$layer)
+
+nrow(df[df$layer>454192.8,])/nrow(df_no0)
 nrow(df_no0[df_no0$layer>40000,])/nrow(df_no0)
-row(df_no0[df_no0$layer>40000,])/nrow(df_no0)
+nrow(df_no0[df_no0$layer>40000,])/nrow(df_no0)
 nrow(df_no0[df_no0$layer<500,])/nrow(df_no0)
 
 df_no0$layer[df_no0$layer>40000] <- 40000
@@ -103,7 +119,6 @@ df_no0%>%
     log_scale+
     theme_void()
   
-max(df_no0$layer)
 
 VTN_2022 <- read.csv("/dados/pessoal/francisco/custo_oportunidade_terra/mun_VTN/mun_VTN_2022_NA_filled.csv")
 

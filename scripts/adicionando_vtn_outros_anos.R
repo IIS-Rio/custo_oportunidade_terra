@@ -6,6 +6,8 @@ library(geobr)
 library(sf)
 library(tidyverse)
 library(dplyr)
+library(fread)
+library(data.table)
 #-------------------------------------------------------------------------------
 
 # checando complementariedade tabelas vtn

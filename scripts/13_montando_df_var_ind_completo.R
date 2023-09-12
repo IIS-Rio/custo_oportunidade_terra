@@ -1,5 +1,6 @@
 #-------------------------------------------------------------------------------
 
+# adiciona variaveis preditoras ao df de variaveis
 # divide os dados de entrada do modelo em regiões
 
 #-------------------------------------------------------------------------------
@@ -14,9 +15,6 @@ library(sf)
 #-------------------------------------------------------------------------------
 
 # dados brutos entrada
-
-# checar, acho que esses dados ja estao com valores imputados, precisa refazer sem os valores imputados, e só imputar depois da regionalização.
-# conferir no script predicting_values_BR!!
 
 # dados entrada
 
@@ -74,3 +72,4 @@ df_clean <- left_join(df_clean,br_df[,c(1,4)],by = join_by(code_muni_IBGE==code_
 
 write.csv(df_clean,"/dados/projetos_andamento/custo_oportunidade/data_econometric_model/independent_variables_complete_updated.csv",row.names = F)
 
+# continuando aqui com as variaveis sugeridas pela re.green
