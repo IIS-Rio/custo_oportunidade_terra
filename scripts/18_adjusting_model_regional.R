@@ -30,7 +30,7 @@ p <- "/dados/projetos_andamento/custo_oportunidade/data_econometric_model/regioe
 
 f <- list.files(p,full.names = T) 
 
-# variaveis preditoras (rever, ta errado as posicoes a 4 eg sudeste mas tinha q ser Sul)
+# variaveis preditoras 
 
 reg_3 <- fread(f[4]) # sudeste
 reg_1 <- fread(f[3]) # Norte
@@ -129,8 +129,7 @@ cor_mat <- cor(cor_df)
 
 # Calculate the p-values for the correlation coefficients
 
-corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower",
-           color = "blue", outline.color = "black",digits = 3)
+corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower", outline.color = "black",digits = 3)
 
 # variaveis correlacionadas (>0.7):
 #******************************************************
@@ -152,18 +151,28 @@ corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower",
 #******************************************************
 # regiao 2:
 #******************************************************
-# clima e x 
+
 # propnat veg e prop agri
+# cidades e garimpo
+# cidades e dist. portos!
+# x com portos e garimpo
+# tirar prop nat veg, portos, garimpo
 
+#******************************************************
 # regiao 5 
-# nao tem
+#******************************************************
+# prop agri e valor producao (ver qual eh mais importante)
+# climate com y
+# IDh com prop urbana
+# gdp per capta com agri subsidy
 
+#******************************************************
 # regiao 1:
-# clima e x 
-# propnat veg e prop past
+# prop agri gdp e gdp agri
+# dist citys e dist port
+# prop past com prop nat veg
+# n ocupados1000 pessoas e conflitos
 
-
-# ajustando modelo inicial (FULL)
 
 # variaveis preditoras excluindo var. correlacionadas
 

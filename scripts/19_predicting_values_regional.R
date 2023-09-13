@@ -1,17 +1,19 @@
 #-------------------------------------------------------------------------------
 
 # extrapolar valores pras regioes
-# por enquanto depende de rodar o script 15. ajustar isso depois
+# por enquanto depende de rodar o script 18 adjusting_model_regional. ajustar isso depois
 #-------------------------------------------------------------------------------
 
 # pacotes ---------------------------------------------------------------------- 
-
+library(data.table) # abre dfs grandes
 library(tidyr)
 library(sf)
-library(raster)
-library(geobr)
+#library(raster)
+library(terra)
+library(geobr) # regioes Br
 library(fasterize)
 library(dplyr)
+library(sampler) # amostragem estratificada
 
 #-------------------------------------------------------------------------------
 
@@ -23,60 +25,47 @@ p <- "/dados/projetos_andamento/custo_oportunidade/data_econometric_model/regioe
 
 f <- list.files(p,full.names = T) 
 
-reg_5 <- fread(f[5])
+# variaveis preditoras 
 
-# lidando com NAs
+reg_3 <- fread(f[4]) # sudeste
+reg_1 <- fread(f[3]) # Norte
+reg_2 <- fread(f[2]) # Nordeste
+reg_4 <- fread(f[5]) # Sul
+reg_5 <- fread(f[1]) # C-O
 
-summary(reg_5)
+# as variaveis agressoes e conflitos so existem pra Amazonia, entao precisa tirar das outras regioes.
 
+reg_3 <- subset(reg_3, select = -c(agressoes, conflitos))
+reg_2 <- subset(reg_2, select = -c(agressoes, conflitos))
+reg_4 <- subset(reg_4, select = -c(agressoes, conflitos))
+reg_5 <- subset(reg_5, select = -c(agressoes, conflitos))
 
-# calcular qntos NAs por variavel e % em razao do N total. Escolher um limiar pra descartar a variavel, caso a importancia seja baixa.
+# montando df pra rodar o modelo -----------------------------------------------
 
-# Count the number of NAs in each column
+# df com variavel resposta:
 
-reg=reg_1 # mudar dependendo da regiao!
+vr <- fread("/dados/projetos_andamento/custo_oportunidade/data_econometric_model/response_updated_regreen.csv")
 
-reg <- as.data.frame(reg)
+# arredondando x e y pra bater o join
 
-reg$vtn <- NA
+vr$x <- round(vr$x)
+vr$y <- round(vr$y)
 
-reg_na_count <- reg %>%
-  summarise(across(everything(), ~ sum(is.na(.))))%>%
-  pivot_longer(cols = -30 ,names_to = "column", values_to = "NAs")%>%
-  mutate(prop_na=round(NAs/nrow(reg),2))%>%
-  dplyr::select(-1)
+# join com  x e y + VTN 
 
+reg = reg_1 # mudar dependendo da regiao! (da pra inserir num loop)
 
-# https://stackoverflow.com/questions/8370455/how-to-use-random-forests-in-r-with-missing-values
+reg <- left_join(reg,vr)
 
-# capacidade armazenamento tem mtos NAs! Mas tudo <=10%
-# mas no caso da regiao 2, nordeste, eh tipo 30%; tem q tirar essa variavel, fazer um update do negocio
+# ajustando modelo - todos os parametros ja estao pre-definidos, mas da pra incluir eles como argumentos na funcao no futuro!
 
-# pro norte, tem que tirar algumas variaveis (q nao estao entre as mais importantes, mas tem alguma relevancia)
-# valor_prod_IBGE_2021
-# capacidade_armazenamento_ton
-# agri_subsidy_pop_total_2010
-# num_maquinarios_mil_unid
+source("/dados/pessoal/francisco/custo_oportunidade_terra/scripts/18_funcao_ajuste_modelo.R")
 
-var_reg_1 <- c("valor_prod_IBGE_2021","capacidade_armazenamento_ton","agri_subsidy_pop_total_2010","num_maquinarios_mil_unid")
+# regiao 4,3,2,5,1
 
-remover <- which(pred_varnames %in%var_reg_1)
+rfModel_full <- vtn_predict(reg=reg)
 
-formula_full_updated <- as.formula(paste("VTN_2022_log ~", paste(pred_varnames[-c(remover)], collapse = "+")))
-
-rfModel_full_updated <- rfsrc(formula = formula_full_updated , data = as.data.frame(train_sc), ntree = 200,nodesize = 20,block.size = 1) 
-
-
-actual <- log(test_sc$VTN_2022)
-test_sc$VTN_2022_log <- log(test_sc$VTN_2022)
-# mantendo apenas as mesmas colunas!
-test_sc2 <- as.data.frame(test_sc)
-#test_sc2 <- test_sc %>% select(names(train_sc))
-predicted <- predict(object = rfModel_full_updated, newdata = test_sc)
-r_full <- caret::R2(pred = predicted$predicted,obs = actual) 
-
-# nao parece fazer mta diferenca tirar as variaveis
-
+# preenchendo NAs das variaveis preditoras, pra gerar valores de vtn pra todas as celulas da grade
 
 # rfImpute() inputa, mas pede os valores de resposta tb, que eu nao tenho! 
 # vou imputar com a mediana mesmo, ja q nenhum valor eh >10% e sao mtas variaveis
@@ -91,7 +80,7 @@ reg_imput <- reg %>%
 
 # Select the continuous variables. can't indluce VTN
 
-continuous_variables_topredict <-which(sapply(reg_imput, is.numeric) & !names(reg_imput) == "VTN_2022")
+continuous_variables_topredict <-which(sapply(reg_imput, is.numeric) & !names(reg_imput) == "vtn")
 
 # scale them
 
@@ -105,132 +94,102 @@ reg_imput_sc <- cbind(reg_imput_sc[, -continuous_variables_topredict], reg_sc_co
 
 # corrigindo nomes - tira % prop com energia 
 
-names(reg_imput_sc)[24] <- "prop_com_energia"
-names(reg_imput_sc)[25] <- "prop_com_ens_superior"
+names(reg_imput_sc)[26] <- "prop_com_energia"
+names(reg_imput_sc)[27] <- "prop_com_ens_superior"
 
-#ajustando categoria pra fator
+#  predizendo valores ---------------------------------------------------------- 
 
-reg_imput_sc$abbrev_state <- as.factor(reg_imput_sc$abbrev_state)
+# (bootstrap??Nao pq randomiza e estraga o predict, mas gerar 10x ja gera uma incerteza) 
 
-# predizendo valores
+#predicted_reg <- predict(object = rfModel_full$model, newdata = reg_imput_sc)
 
-predicted_reg <- predict(object = rfModel_full_updated, newdata = reg_imput_sc)
+# Initialize a matrix to store the bootstrapped predictions
+
+bootstrap_predictions <- matrix(nrow = nrow(reg_imput_sc), ncol = 10)
+
+# Number of "bootstraps"
+
+n_bootstraps <- 10
+
+# Perform "bootstrapping"
+
+for(i in 1:n_bootstraps){
+  
+  
+  # Predict on the bootstrapped data
+  predicted_reg <- predict(object = rfModel_full$model, newdata = reg_imput_sc)
+  
+  # Store the predictions
+  bootstrap_predictions[,i] <- predicted_reg$predicted
+
+  }
+
+
+# Calculate the median of each row
+
+row_medians <- apply(bootstrap_predictions, 1, median)
+
+# Add the medians as a new column to the matrix
+
+bootstrap_predictions <- cbind(bootstrap_predictions, "Median_VTN" = row_medians)
+
+
+# Calculate the lower and upper confidence limits for each row
+
+lower_limit <- apply(bootstrap_predictions, 1, function(x) quantile(x, probs = 0.025))
+
+upper_limit <- apply(bootstrap_predictions, 1, function(x) quantile(x, probs = 0.975))
+
+# Add the confidence limits as new columns to the matrix
+
+bootstrap_predictions <- cbind(bootstrap_predictions, "Lower Limit" = lower_limit, "Upper Limit" = upper_limit)
+
 
 # adicionando a planilha original nao escalada!
 
-reg$predicted_VTN_2022_log <- predicted_reg$predicted
-reg$predicted_VTN_2022 <- exp(reg$predicted_VTN_2022_log)
+#reg_pred <- cbind(reg,bootstrap_predictions[,11:13])
+
+# sem os limits
+
+reg_pred <- cbind(reg,"Median_VTN"=bootstrap_predictions[,11])
+
+# obs: por enquanto estamos usando so o valor mediano, mas tem a incerteza calculada
 
 # rasterizando
 
 # Convert the data frame to an sf object
 
-names(reg)
-
-predicted_df_sp <- st_as_sf(reg, coords = c("x", "y") )
+predicted_df_sp <- st_as_sf(reg_pred, coords = c("x", "y") )
 
 
 # raster base 
 
 r <- raster("/dados/projetos_andamento/custo_oportunidade/lu_mapbiomas_2020_1km/cropland_1km.tif")
 
+r[!is.na(r)] <- 0
 
-resolution <- res(r)  # Specify the resolution of the raster
+# exponenciando vtn
 
-# tem q pegar so regiao sul
+predicted_df_sp$Median_VTN_exp <- exp(predicted_df_sp$Median_VTN)
 
-regioes <- read_region(year=2020)
+# eu sei q nao precisava repetir, mas eh so pra garantir por enquanto que eu to fazendo manualmente, que nao sobrescrevo nada; Se transformar em loop, tem q ser objeto unico!
 
-Sul <- regioes%>%
-  filter(code_region==4)
-
-Sudeste <-  regioes%>%
-  filter(code_region==3)
-
-Nordeste <-  regioes%>%
-  filter(code_region==2)
-
-CO <-  regioes%>%
-  filter(code_region==5)
+VTN_r_sul <-rasterize(predicted_df_sp, r, field = "Median_VTN_exp")
+VTN_r_sudeste <-rasterize(predicted_df_sp, r, field = "Median_VTN_exp")
+VTN_r_nordeste <-rasterize(predicted_df_sp, r, field = "Median_VTN_exp")
+VTN_r_co <-rasterize(predicted_df_sp, r, field = "Median_VTN_exp")
+VTN_r_norte <-rasterize(predicted_df_sp, r, field = "Median_VTN_exp")
 
 
-NORTE <-  regioes%>%
-  filter(code_region==1)
+writeRaster(x = VTN_r_sul,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5/predicted_VTN_multi_ano_SUL.tif",overwrite=T)
 
+writeRaster(x = VTN_r_sudeste,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5/predicted_VTN_multi_ano_SUDESTE.tif")
 
-# adequando projecao
+writeRaster(x = VTN_r_nordeste,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5/predicted_VTN_multi_ano_NORDESTE.tif")
 
-Sul_pj <- st_transform(Sul,crs(r))
-Sudeste_pj <- st_transform(Sudeste,crs(r))
-Nordeste_pj <- st_transform(Nordeste,crs(r))
-CO_pj <- st_transform(CO,crs(r))
-NORTE_pj <- st_transform(NORTE,crs(r))
+writeRaster(x = VTN_r_co,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5/predicted_VTN_multi_ano_CENTRO_OESTE.tif")
 
+writeRaster(x = VTN_r_norte,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5/predicted_multi_ano_NORTE.tif")
 
-r_sul <- crop(r,Sul_pj)
-
-r_sudeste <- crop(r,Sudeste_pj)
-r_sudeste <- mask(r_sudeste,Sudeste_pj)
-
-r_co <- crop(r,CO_pj)
-r_co <- mask(r_co,CO_pj)
-
-r_nordeste <- crop(r,Nordeste_pj)
-r_nordeste <- mask(r_nordeste,Nordeste_pj)
-
-r_norte <- crop(r,NORTE_pj)
-r_nordeste <- mask(r_norte,NORTE_pj)
-
-
-plot(r_sul)
-plot(r_sudeste)
-
-extent <- extent(r_sul)  # Specify the extent of the raster
-extent <- extent(r_sudeste)
-extent <- extent(r_nordeste)
-extent <- extent(r_co)
-extent <- extent(r_norte)
-
-
-r_base <- raster(extent, resolution = resolution)
-
-crs(r_base) <- crs(r)
-
-# nao consegui com fazterize!
-
-VTN_r_sul <-rasterize(predicted_df_sp, r_base, field = "predicted_VTN_2022")
-VTN_r_sudeste <-rasterize(predicted_df_sp, r_base, field = "predicted_VTN_2022")
-VTN_r_nordeste <-rasterize(predicted_df_sp, r_base, field = "predicted_VTN_2022")
-VTN_r_co <-rasterize(predicted_df_sp, r_base, field = "predicted_VTN_2022")
-VTN_r_norte <-rasterize(predicted_df_sp, r_base, field = "predicted_VTN_2022")
-
-plot(st_geometry(Sudeste_pj))
-plot(log(VTN_r_sul),add=T)
-
-plot(st_geometry(Nordeste_pj))
-plot(log(VTN_r_nordeste),add=T)
-
-plot(st_geometry(CO_pj))
-plot(log(VTN_r_co),add=T)
-
-
-plot(st_geometry(NORTE_pj))
-plot(log(VTN_r_norte),add=T)
-plot((VTN_r_norte),add=T)
-
-
-writeRaster(x = VTN_r_sul,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/predicted_VTN_2022_SUL.tif")
-
-writeRaster(x = VTN_r_sudeste,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/predicted_VTN_2022_SUDESTE.tif")
-
-writeRaster(x = VTN_r_nordeste,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/predicted_VTN_2022_NORDESTE.tif")
-
-writeRaster(x = VTN_r_co,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5/predicted_VTN_2022_CENTRO_OESTE.tif")
-
-writeRaster(x = VTN_r_norte,filename = "/dados/projetos_andamento/custo_oportunidade/rasters_VTN/regioes_5/predicted_VTN_2022_NORTE.tif")
-
-summary(VTN_r_sul[])
-summary(VTN_r_sudeste[])
-summary(VTN_r_nordeste[])
-summary(VTN_r_co[])
-summary(VTN_r_norte[])
+# limpando environment
+rm(reg,reg_imput,reg_imput_sc,reg_imput_sc,reg_pred,reg_sc_continuous,rfModel_full,predicted_df_sp,predicted_reg,predicted_reg_IC,VTN_r_sul,bootstrap_data,bootstrap_predictions)
