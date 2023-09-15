@@ -38,9 +38,9 @@ vtn_23 <- fread("/dados/projetos_andamento/custo_oportunidade/data/VTN_RF_2023.c
 
 # precisa padronizar uf tb pq uma tem municipio e estado algo assim
 
-vtn_19_l <- pivot_longer(vtn_19,c(2,5:10)) %>%
+vtn_19_l <-( pivot_longer(vtn_19,c(2,5:10))) %>%
   # exclui Fonte
-  select(-Fonte)%>%
+  dplyr::select(-Fonte)%>%
   mutate(
     # adicionando ano
     #ano=2023,
@@ -54,7 +54,7 @@ vtn_19_l <- pivot_longer(vtn_19,c(2,5:10)) %>%
 
 vtn_23_l <- pivot_longer(vtn_23,c(2:7))%>%
   # exclui Fonte
-  select(-Fonte)%>%
+  dplyr::select(-Fonte)%>%
   # adicionando ano
   #mutate(ano=2023) %>%
   #padronizando nome
@@ -310,11 +310,49 @@ m <- mosaic(rsrc)
 plot(log10(m))
 plot(m)
 
-#ficou bizarro pq penaliza mto o nordeste. melhor seria usar um g unico!
-
-# g unico fica melhor!
+#usar g por regiao ficou bizarro pq penaliza mto o nordeste. melhor seria usar um g unico!# g unico fica melhor!
  
+# alternativa. calcular juros reais, oq seria o rendimento esperado se o dinheiro fosse aplicado. Fazer pra 2022 pra ter 1 ano inteiro:
+
+# (1 + in) = (1 + r) * (1 + j)
+
+# Na fórmula, temos:
+
+# in = taxa de juros nominal # selic (temos)
+# r = taxa de juros real  # essa calculamos
+# j = inflação do período aqui usamos o IPCA acumulado (temos)
 
 
+# selic acumulada!
+# indice correcao = 1,27786944
 
 
+selic_acumulada=0.27786944 # 2019_2023
+selic_2023 <- 0.08811235 # janeiro a agosto
+IPCA_2023 <- 0.03231200 # janeiro a agosto
+# fica mega pouco. Talvez fazer so de 2023, nao acumulado!
+
+# acumulado
+juro_real = ((1+selic_acumulada)/(1+fator_correcao_2019_2023))-1
+# 2023
+juro_real = ((1+selic_2023)/(1+IPCA_2023))-1 # esse aqui ta melhor!
+
+# aplicando juro real sobre o vtn (logica de que seria oq renderia o dinheiro caso aplicado em produtos financeiros)
+
+renda2_l <- lapply(vtn_r,function(x)x*juro_real)
+
+# make a SpatRasterCollection
+
+rsrc_juro_Real <- sprc(renda2_l)
+
+# mosaicando
+
+m_juro_real <- mosaic(rsrc_juro_Real)
+
+# um valor eh 10x maior q o outro!
+
+plot(log10(m_juro_real))
+plot(m_juro_real>2000)
+plot(m_juro_real<=1000)
+
+# precisa decidir oq faz mais sentido
