@@ -330,9 +330,8 @@ plot(m)
 selic_acumulada=0.27786944 # 2019_2023
 selic_2023 <- 0.08811235 # janeiro a agosto
 IPCA_2023 <- 0.03231200 # janeiro a agosto
-# fica mega pouco. Talvez fazer so de 2023, nao acumulado!
 
-# acumulado
+
 juro_real = ((1+selic_acumulada)/(1+fator_correcao_2019_2023))-1
 # 2023
 juro_real = ((1+selic_2023)/(1+IPCA_2023))-1 # esse aqui ta melhor!
