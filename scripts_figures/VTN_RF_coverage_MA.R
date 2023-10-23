@@ -31,20 +31,20 @@ MA <- read_biomes(year=2019)%>%
   filter(code_biome==4)%>%
   st_transform(crs("+proj=moll"))
 
-# mascara sul, sudeste, nordeste
-
-regioes <- read_region(year=2019)%>%
-  #filtrando
-  filter(code_region %in% c(2,3,4))%>%
-  st_transform(crs("+proj=moll"))
+# # mascara sul, sudeste, nordeste
+# 
+# regioes <- read_region(year=2019)%>%
+#   #filtrando
+#   filter(code_region %in% c(2,3,4,5))%>%
+#   st_transform(crs("+proj=moll"))
 
 
 MAc <- st_crop(x=MA, y=extent_to_keep)
-regioesc <- st_crop(x=regioes, y=extent_to_keep)
+#regioesc <- st_crop(x=regioes, y=extent_to_keep)
 
 
-vtn_c <- crop(vtn,regioesc)
-vtn_m <- mask(vtn_c,regioesc)
+vtn_c <- crop(vtn,MAc)
+vtn_m <- mask(vtn_c,MAc)
 
 # vizualizacao simples
 plot(vtn_m)
@@ -58,14 +58,6 @@ vtn_df <- as.data.frame(vtn_m, xy = TRUE)
 
 small_constant <- 0.00001
 
-# my_palette <- scale_fill_gradient(
-#   high = "red",
-#   low = "blue",
-#   name = "R$/ha",
-#   breaks = c(100, 1000, 15000),  # Specify the desired break points
-#   labels = comma,
-#   trans = "log10"
-# )
 
 my_palette <- scale_fill_gradientn(
   colors = c("gray", "orange", "yellow", "darkgreen"),
@@ -82,7 +74,7 @@ VTN_plot <- vtn_df %>%
   #filter(regiao==rg) %>%
   mutate(value=VTN_ha_RF_agg_2019_2023+small_constant) %>%
   ggplot() +
-  geom_sf(data=regioesc, fill="lightgray",color="black")+
+  geom_sf(data=MAc, fill="lightgray",color="black")+
   geom_tile(aes(x = x, y = y, fill = value)) +
   geom_sf(data=MAc, fill="NA",color="black")+
   #scale_fill_viridis_c(option = "magma", direction = -1,
@@ -90,13 +82,13 @@ VTN_plot <- vtn_df %>%
   my_palette +  # Apply the custom palette
   labs( fill = "R$/ha")+
   theme_map()+
-  theme(text=element_text(size=7),legend.position = c(-0.05,0.60), legend.box = "horizontal")+
+  theme(text=element_text(size=7),legend.position = c(0.1,0.70), legend.box = "horizontal")+
   # box da legenda transparente(nao funciona)
   theme(legend.key = element_rect(fill = "transparent"))
 
 # x antes era 0.02, y 0.65
 
-ggsave(plot = VTN_plot,filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/entrega_MA/var_resposta_MA_regioes_RF2019_2023.png",width = 10,height = 10,units = "cm", dpi = 150, bg = "white")
+ggsave(plot = VTN_plot,filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/entrega_MA/var_resposta_MA_RF2019_2023.png",width = 10,height = 10,units = "cm", dpi = 150, bg = "white")
 
 
 # talvez seja melhor mostrar como foi feito pras regioes sul,sudeste e nordeste??
