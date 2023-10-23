@@ -54,14 +54,18 @@ vr <- fread("/dados/projetos_andamento/custo_oportunidade/data_econometric_model
 vr$x <- round(vr$x)
 vr$y <- round(vr$y)
 
+# combinar as 3 regioes 
+
+reg <- rbind(reg_2,reg_3,reg_4)
+
 # join com  x e y + VTN 
 
-# deixar generico pra valer pra todas (pode ser um loop)
-
-reg <- reg_3 # muda dependendo da regiao interesse
-
-
 reg <- left_join(reg,vr)
+
+# cruzando shape municipios com biomas
+
+
+
 
 # pacote sampler
 
@@ -135,11 +139,8 @@ corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower", outline.color = 
 #******************************************************
 # regiao 4 (Sul):
 #******************************************************
-# x com Distancia  portos, dist Garimpo e dist. cidades
-# Dist cidades vs dist garimpo
-# prop.agri e prop. nat veg (>0.7)
 
-# manter x e prop. agri
+#prop agri gdp com gdp agricola
 
 #******************************************************
 # regiao 3 (Sudeste):
