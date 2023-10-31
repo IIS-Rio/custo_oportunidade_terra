@@ -1,17 +1,14 @@
+# esse script é usado no script 02 e nao precisa ser aberto
+
 
 vtn_predict <- function(reg){
+  
   # pacotes --------------------------------------------------------------------
   
   library(data.table) # abre dfs grandes
   library(dplyr)
-  #library(sf)
-  #library(tidyr)
-  #library(purrr)
   library(sampler) # amostragem estratificada
   library(randomForestSRC)
-  #library(randomForest)
-  # esses sao pra avaliacao modelo
-  
   #-----------------------------------------------------------------------------
   
   
@@ -24,6 +21,7 @@ vtn_predict <- function(reg){
     }else{fracao_amostragrem <- 0.5}
     
   
+  # amostragem dos dados
   
   s <- ssamp( reg,n=round((nrow(reg)*fracao_amostragrem),0),strata = code_muni_IBGE)
   
@@ -43,7 +41,7 @@ vtn_predict <- function(reg){
   train_sc <- trainData
   test_sc <- testData
   
-  # codigo regiao e municipio tem que ser fator
+  # transformando variaveis em fator
   
   train_sc$code_muni_IBGE <- as.factor(train_sc$code_muni_IBGE)
   train_sc$cod_rgn <- as.factor(train_sc$cod_rgn)
@@ -54,17 +52,12 @@ vtn_predict <- function(reg){
   test_sc$abbrev_state <- as.factor(test_sc$abbrev_state)
   test_sc$cod_stt <- as.factor(test_sc$cod_stt)
   
-  # aplicando scale pras variaveis continuas (inclui x e y como variaveis escaladas)
+  # aplicando scale pras variaveis continuas 
   
-  # Select the continuous variables. can't indluce VTN
-  
-  # apagar, nao ta mais funcionando
   
   continuous_variables <- which(sapply(train_sc, is.numeric) & !names(train_sc) == "vtn")
   
-  continuous_variables_test <-as.numeric(which(sapply(test_sc, is.numeric) & !names(test_sc) == "vtn"))
-  
-  # scale them
+  # escalando variaveis continuas
   
   train_sc_continuous <- as.data.frame(apply(subset(train_sc, select = names(continuous_variables)),2,scale))
   
@@ -81,21 +74,15 @@ vtn_predict <- function(reg){
   # Mata Atlantica
   #******************************************************
   # prop. agri gdp com gdp agricola
+  # dist. garimpo com X
   
   # manter x e prop. agri
   
   if(unique(reg$biome) =="Mata_Atlantica"){
       
-      excluir <- c("PropAgriGDP","vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt")
+      excluir <- c("PropAgriGDP","vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","DistGarimp","biome","x","y")
     }
     
-  # corrigindo nomes - tira % prop com energia 
-  
-  names(train_sc)[29] <- "prop_com_energia"
-  names(train_sc)[30] <- "prop_com_ens_superior"
-  
-  names(test_sc)[29] <- "prop_com_energia"
-  names(test_sc)[30] <- "prop_com_ens_superior"
   
   # excluindo variaveis correlacionadas e resposta
   
@@ -144,9 +131,6 @@ vtn_predict <- function(reg){
   
   actual <- log(test_sc$vtn)
   test_sc$VTN_log <- log(test_sc$vtn)
-  # mantendo apenas as mesmas colunas!
-  #test_sc2 <- as.data.frame(test_sc)
-  #test_sc2 <- test_sc %>% select(names(train_sc))
   predicted <- predict(object = rfModel_full, newdata = test_sc)
   r_full <- caret::R2(pred = predicted$predicted,obs = actual) 
   r_rmse <- caret::RMSE(pred = predicted$predicted,obs = actual)

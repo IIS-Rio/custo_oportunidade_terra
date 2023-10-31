@@ -9,7 +9,7 @@
 library(data.table) # abre dfs grandes
 library(dplyr)
 #library(sf)
-#library(tidyr)
+library(tidyr)
 #library(purrr)
 library(sampler) # amostragem estratificada
 library(ggcorrplot)
@@ -28,10 +28,15 @@ f <- list.files(p,full.names = T)
 
 df <- fread(f[1]) # MA
 
+df <- as.data.frame(df)
+
+df_noxy_garimpo <- df%>%
+  as_tibble() %>%
+  dplyr::select(-c("x", "y", "DistGarimp"))
 
 fracao_amostragrem <- 0.5 # varia conforme o bioma (sul, sudeste, 30%; nordeste tem mto NA, melhor pegar fracao maior; centro-oeste=30%;Norte=50)
 
-s <- ssamp(df = df,n=round((nrow(df)*fracao_amostragrem),0),strata = code_muni_IBGE)
+s <- ssamp(df = df_noxy_garimpo,n=round((nrow(df)*fracao_amostragrem),0),strata = code_muni_IBGE)
 
 
 # dividindo dados 
@@ -93,8 +98,6 @@ cor_mat <- cor(cor_df)
 
 # tem variaveis correlacionadas X tem uma q eh 0.70 com garimpo
 
-
-
 corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower", outline.color = "black",digits = 3)+ggtitle("Sul")
 
 
@@ -115,4 +118,4 @@ corplot <- corplot +
 # ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/entrega_MA/corrplots_SUl_SE_NE.png",width = 21,height = 10,units = "cm", dpi = 150, bg = "white",plot = cor_pan)
 
 
-ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/entrega_MA/corrplotMA.png",width = 10,height = 10,units = "cm", dpi = 150, bg = "white",plot = corplot)
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/entrega_MA/corrplotMA_noxy.png",width = 10,height = 10,units = "cm", dpi = 150, bg = "white",plot = corplot)

@@ -1,21 +1,22 @@
 #-------------------------------------------------------------------------------
 
-# extrapolar valores pras biomas
+# extrapolar valores para biomas
 
 #-------------------------------------------------------------------------------
 
 # pacotes ---------------------------------------------------------------------- 
-library(data.table) # abre dfs grandes
+
+library(data.table) 
 library(tidyr)
 library(sf)
-#library(raster)
-library(terra)
+library(raster)
+#library(terra)
 library(fasterize)
 library(dplyr)
 
 #-------------------------------------------------------------------------------
 
-# caminho dados biomas
+# caminho dados 
 
 p <- "/dados/projetos_andamento/custo_oportunidade/data_econometric_model/biomes"
 
@@ -33,6 +34,7 @@ source("/dados/pessoal/francisco/custo_oportunidade_terra/scripts/regreen/01_fun
 
 
 rfModel_full <- vtn_predict(reg=df)
+
 
 # preenchendo NAs das variaveis preditoras, pra gerar valores de vtn pra todas as celulas da grade, imputando mediana dos valores (nao tem nada com mais de 10% de NA)
 
@@ -55,11 +57,6 @@ df_sc_continuous <- as.data.frame(apply(df_imput_sc[,c(continuous_variables_topr
 
 df_imput_sc <- cbind(df_imput_sc[, -continuous_variables_topredict], df_sc_continuous)
 
-# corrigindo nomes - tira "%" 
-
-names(df_imput_sc)[27] <- "prop_com_energia"
-names(df_imput_sc)[28] <- "prop_com_ens_superior"
-
 #  predizendo valores ---------------------------------------------------------- 
 
 
@@ -71,44 +68,9 @@ predicted_df <- predict(object = rfModel_full$model, newdata = df_imput_sc)
 
 df_pred <- cbind(df,"predicted_VTN"=predicted_df$predicted)
 
-# salvando dados
+# salvando dados (falta salvar com xy mas so modificando os dados da funcao pra nao ler x e y! eh mais facil!)
 
 write.csv(df_pred,file = "/dados/projetos_andamento/custo_oportunidade/resultados_regreen/MA_full_dataset_predicted_values.csv",row.names = F)
 
 
-# rasterizando
-
-# Convert the data frame to an sf object
-
-predicted_df_sp <- st_as_sf(df_pred, coords = c("x", "y") )
-
-
-MA <- st_read("/dados/projetos_andamento/custo_oportunidade/resultados_regreen/mata_atlantica_limites.shp")
-
-
-r <- raster("/dados/projetos_andamento/custo_oportunidade/resultados_regreen/base_raster.tif")
-
-# r base pra rasterizar, vale pra todos
-
-# exponenciando vtn
-
-predicted_df_sp$Predicted_VTN_exp <- exp(predicted_df_sp$predicted_VTN)
-
-VTN_predito <-rasterize(predicted_df_sp, r, field = "Predicted_VTN_exp")
-
-# recorte mascara MA
-
-VTN_predito_c <- crop(VTN_predito,MA)
-VTN_predito_m <- mask(VTN_predito_c,MA)
-
-# ajustando grid pra 1km
-
-# r base pra rasterizar, vale pra todos
-
-r_1km <- raster(extent(VTN_predito_m), resolution = c(1000, 1000),crs=crs(r))
-
-VTN_final <- resample(VTN_predito_m,r_1km)
-
-
-writeRaster(x = VTN_final,filename = "/dados/projetos_andamento/custo_oportunidade/resultados_regreen/predicted_VTN_MA.tif",overwrite=T)
 
