@@ -9,6 +9,7 @@ vtn_predict <- function(reg){
   library(dplyr)
   library(sampler) # amostragem estratificada
   library(randomForestSRC)
+  library(tidyverse)
   #-----------------------------------------------------------------------------
   
   

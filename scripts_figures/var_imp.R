@@ -48,9 +48,13 @@ varimp_MA2 <- varimp_MA
 
 varimp_MA2$vimp <- varimp_MA2$vimp/sum(varimp_MA2$vimp)  
 
+# curva cumulativa
+
+varimp_MA2$cumulative <- cumsum(varimp_MA2$vimp)
+
 # ajustando label var
 
-labsMA <- c("valor da produção","dist.portos","clima","n.maq.","gdp/capta",          "% agri.","dist.cidades>500k","prop.ensino sup.","%prop.energia","IDH","%proprietários","gdp agri.","n.ocupados","sub.agri.","%prop.urb.","relevo","solo","prop.prop>100ha","dist.rod.fed","% past.","% veg.nat.","%prop. privada","dist.rod.est.")
+labsMA <- c("valor da produção","dist.portos","clima","n.maq.","PIB/capta","% agri.","dist.cidades>500k","prop.ensino sup.","%prop.energia","IDH","%proprietários","sub.agri.","PIB agric.","n.ocupados","%prop.urb.","prop.prop>100ha","relevo","dist.rod.fed","solo","% veg.nat.","% past.","%prop. privada","dist.rod.est.")
 
 #varimp_MA2$vars <- droplevels(varimp_MA2$vars)
 varimp_MA2$vars <- labsMA
@@ -65,7 +69,7 @@ write.csv(df2save,"/dados/projetos_andamento/custo_oportunidade/resultados_regre
 
 
 
-
+# varimp_MA2 <- read.csv("/dados/projetos_andamento/custo_oportunidade/resultados_regreen/varimp.csv")
 
 
 plotMA <- ggplot(varimp_MA2, aes(x = vars, y = vimp))+
@@ -75,9 +79,6 @@ plotMA <- ggplot(varimp_MA2, aes(x = vars, y = vimp))+
   theme(text = element_text(size = 7))+
   ggtitle("Mata Atlântica") +
   coord_flip()
-
-# Calculate the cumulative sum of the importance scores
-varimp_MA2$cumulative <- cumsum(varimp_MA2$vimp)
 
 
 # plot com curva acumulada

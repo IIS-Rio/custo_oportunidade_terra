@@ -73,9 +73,12 @@ plotMA <- ggplot(varimp_MA2, aes(x = vars, y = vimp))+
   ggtitle("") +
   coord_flip()
 
-# Calculate the cumulative sum of the importance scores
-varimp_MA2$cumulative <- cumsum(varimp_MA2$vimp)
 
+varimp_MA2 <- read.csv("/dados/projetos_andamento/custo_oportunidade/resultados_regreen/varimp.csv")
+
+labsMA <- c("valor da produção","dist.portos","clima","n.maq.","PIB/capta","% agri.","dist.cidades>500k","prop.ensino sup.","%prop.energia","IDH","%proprietários","sub.agri.","PIB agric.","n.ocupados","%prop.urb.","prop.prop>100ha","relevo","dist.rod.fed","solo","% veg.nat.","% past.","%prop. privada","dist.rod.est.")
+
+varimp_MA2$vars <- factor(varimp_MA2$vars,levels = rev(labsMA))
 
 # plot com curva acumulada
 
@@ -97,6 +100,6 @@ panel <- ggarrange(plotMA,plotMA2,VTN_plot,ncol =3,labels = c("A","B","C") )
 
 
 
-ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/entrega_MA/predres_varimp_MA_combined.png",width = 18,height = 5,units = "cm", dpi = 150, bg = "white",plot = panel)
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/entrega_MA/predres_varimp_MA_combined_corrigido.png",width = 18,height = 5,units = "cm", dpi = 150, bg = "white",plot = panel)
 
 
