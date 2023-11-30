@@ -19,7 +19,8 @@ r_base <- raster("/dados/projetos_andamento/custo_oportunidade/lu_mapbiomas_2020
 
 # UCs --------------------------------------------------------------------------
 UCs <- read_conservation_units()%>% st_transform(crs(r_base))
-norte <- read_region(2020)%>%filter(code_region==1)%>% st_transform(crs(r_base))
+# aqui tinha q ter feito bioma nao regiao! pra ficar certo
+norte <- read_biomes(2019)%>%filter(code_biome==1)%>% st_transform(crs(r_base))
 
 UCsr <- fasterize(UCs,r_base)
 norter <- fasterize(norte,r_base)
@@ -48,7 +49,7 @@ UC2[UC2==4] <- NA
 UC2 <- rast(UC2)
 dist_UC <- terra::distance(UC2,exclude=1,unit="km")
 
-writeRaster(dist_UC,"/dados/projetos_andamento/custo_oportunidade/UCs_TIs/distUCs.tiff", overwrite=T,gdal=c("COMPRESS=DEFLATE"))
+writeRaster(dist_UC,"/dados/projetos_andamento/custo_oportunidade/UCs_TIs/distUCsAM.tiff", overwrite=T,gdal=c("COMPRESS=DEFLATE"))
 
 #- Tis -------------------------------------------------------------------------
 
@@ -73,4 +74,4 @@ TI2[TI2==4] <- NA
 TI2 <- rast(TI2)
 dist_TI <- terra::distance(TI2,exclude=1,unit="km")
 
-writeRaster(dist_TI,"/dados/projetos_andamento/custo_oportunidade/UCs_TIs/distTIs.tiff", overwrite=T,gdal=c("COMPRESS=DEFLATE"))
+writeRaster(dist_TI,"/dados/projetos_andamento/custo_oportunidade/UCs_TIs/distTIsAM.tiff", overwrite=T,gdal=c("COMPRESS=DEFLATE"))

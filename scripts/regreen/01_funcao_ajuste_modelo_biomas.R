@@ -82,7 +82,14 @@ vtn_predict <- function(reg){
   if(unique(reg$biome) =="Mata_Atlantica"){
       
       excluir <- c("PropAgriGDP","vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","DistGarimp","biome","x","y")
-    }
+    
+  }
+  
+  if(unique(reg$biome) =="Amazonia"){
+    
+    excluir <- c("PropAgriGDP","vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","biome","x","y","conflitos","PropNatVeg","valor_prod_IBGE_2021","agri_subsidy_pop_total_2010",'capacidade_armazenamento_ton')
+    
+  }
     
   
   # excluindo variaveis correlacionadas e resposta
