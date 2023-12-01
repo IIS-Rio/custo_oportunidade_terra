@@ -26,7 +26,9 @@ f <- list.files(p,full.names = T)
 
 # variaveis preditoras 
 
-df <- fread(f[1]) # Mata Atlantica
+df <- fread(f[1]) # Amazonia
+
+write.csv(df,"/dados/projetos_andamento/custo_oportunidade/data_econometric_model/biomes/Amazonia_UCsTIs.csv",row.names = F)
 
 # ajustando modelo - todos os parametros ja estao pre-definidos, mas da pra incluir eles como argumentos na funcao no futuro!
 
@@ -73,4 +75,4 @@ df_pred <- cbind(df,"predicted_VTN"=predicted_df$predicted)
 write.csv(df_pred,file = "/dados/projetos_andamento/custo_oportunidade/resultados_regreen/MA_full_dataset_predicted_values.csv",row.names = F)
 
 
-
+write.csv(df_pred,file = "/dados/projetos_andamento/custo_oportunidade/resultados_regreen/AM_full_dataset_predicted_values.csv",row.names = F)
