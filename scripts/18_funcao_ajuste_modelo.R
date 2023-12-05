@@ -23,8 +23,16 @@ vtn_predict <- function(reg){
       
     }else{fracao_amostragrem <- 0.5}
     
+  # elinia agressoes e conflitos
   
-  
+  if (unique(reg$cod_rgn) %in% c(2,3, 4, 5)){
+    
+    reg <- subset(reg, select = -c(agressoes, conflitos))
+    
+  }else{
+    reg=reg
+    }
+ 
   s <- ssamp( reg,n=round((nrow(reg)*fracao_amostragrem),0),strata = code_muni_IBGE)
   
   # dividindo dados 
@@ -79,45 +87,42 @@ vtn_predict <- function(reg){
   #******************************************************
   # regiao 4 (Sul):
   #******************************************************
-  # x com Distancia  portos, dist Garimpo e dist. cidades
-  # Dist cidades vs dist garimpo
-  # prop.agri e prop. nat veg (>0.7)
-  
-  # manter x e prop. agri
-  
+  # Dist cidades vs dist garimpo - remover DistGarimp
+  # prop. agri. gdp e gdp agricola - remover PropAgriGDP
+  # n ocupados e n. maquinarios - remover num_maquinarios_mil_unid
   #******************************************************
   # regiao 3 (Sudeste):
   #******************************************************
-  # clima e distancia cidades (WTF?!!)
-  # distancia cidades e y
-  
-  
+  # IDH e prop urb - remover prop_urb
+  # gdp_agr e  PropAgriGDP - remover PropAgriGDP
   #******************************************************
-  # regiao 2:
+  # regiao 2: NE
   #******************************************************
   
-  # propnat veg e prop agri
-  # cidades e garimpo
-  # cidades e dist. portos!
-  # x com portos e garimpo
-  # tirar prop nat veg, portos, garimpo
+  # cidades e garimpo - remover DistGarimp
+  # cidades e dist. portos! - remover dist_portos
+  # IDHm2010 e  prop_urb - remover DHm2010
+  # PropAgriGDP e  agri_subsidy_pop_total_2010 - remover agri_subsidy_pop_total_2010
+  # gdp_per_capita e  agri_subsidy_pop_total_2010 - remover agri_subsidy_pop_total_2010
+  # num_maquinarios_mil_unid e   agri_subsidy_pop_total_2010 -  remover agri_subsidy_pop_total_2010
+  # gdp_agr e  PropAgriGDP - remover PropAgriGDP
+  #  num_maquinarios_mil_unid e  gdp_per_capita - remover num_maquinarios_mil_unid
+  # capacidade_armazenamento_ton e  num_maquinarios_mil_unid - remover num_maquinarios_mil_unid
+  # DistGarimp e  dist_portos - remover DistGarimp
   
   #******************************************************
-  # regiao 5 
+  # regiao 5 CO
   #******************************************************
-  # prop agri e valor producao
-  # climate com y
-  # IDh com prop urbana
-  # gdp per capta com agri subsidy
+  # prop agri e valor producao - remover valor_prod_IBGE_2021
+  # IDh com prop urbana - remover IDHm2010
+  # gdp agri e PropAgriGDP - PropAgriGDP
   
   #******************************************************
-  # regiao 1:
+  # regiao 1: norte
   #******************************************************
-  # prop agri gdp e gdp agri
-  # dist citys e dist port
-  # prop past com prop nat veg
-  # n ocupados1000 pessoas e conflitos
-  
+  # prop agri gdp e gdp agri (ok) - remover PropAgriGDP
+  # dist citys e dist port (ok) - remover dist_portos
+  # IDH e pop urbana (ok) - remover IDHm2010
   #******************************************************
   
   # ajustando modelo inicial (FULL)
@@ -128,43 +133,44 @@ vtn_predict <- function(reg){
     
     if(unique(reg$cod_rgn)==4){
       
-      # regiao 4:
+      # regiao 4 (SUL) (OK):
       
-      excluir <- c("PropNatVeg","vtn","dist_portos","DistCitiesover500k","code_muni_IBGE","nam_rgn","cod_rgn","DistGarimp","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt")
+      excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","DistGarimp","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","PropAgriGDP","x","y")
     }
+  
+    # regiao 3 (SE)
     
     if(unique(reg$cod_rgn)==3){
       
-      excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","DistCitiesover500k")  
+      excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","prop_urb","PropAgriGDP","DistGarimp")  
     }
-  #  regiao 2
+  #  regiao 2 (NE)
   
   if(unique(reg$cod_rgn)==2){
     
-    excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","DistGarimp","dist_portos","PropNatVeg")  
+    excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","DistGarimp","dist_portos","IDHm2010","agri_subsidy_pop_total_2010","PropAgriGDP","num_maquinarios_mil_unid","x","y")  
   }
   
-  #  regiao 5
+  #  regiao 5 (CO)
   
   if(unique(reg$cod_rgn)==5){
     
-    excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","PropAgri","Climate","IDHm2010","agri_subsidy_pop_total_2010")  
+    excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","valor_prod_IBGE_2021","IDHm2010","PropAgriGDP","x","y")  
   }
     
-  #  regiao 1
+  #  regiao 1 (N)
   
   if(unique(reg$cod_rgn)==1){
     
-    excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","gdp_agr","dist_portos","PropNatVeg","conflitos")  
+    excluir <- c("vtn","code_muni_IBGE","nam_rgn","cod_rgn","name_mn","cod_stt","abbrv_s","abbrev_state","nam_stt","PropAgriGDP","x","y","dist_portos","IDHm2010")  
   }
   
-  # corrigindo nomes - tira % prop com energia 
-  
-  names(train_sc)[28] <- "prop_com_energia"
-  names(train_sc)[29] <- "prop_com_ens_superior"
-  
-  names(test_sc)[28] <- "prop_com_energia"
-  names(test_sc)[29] <- "prop_com_ens_superior"
+  # corrigindo nomes - tira % 
+  names(train_sc)[grep(pattern = "energia",x = names(train_sc))]<- "prop_com_energia"
+  names(train_sc)[grep(pattern = "superior",x = names(train_sc))] <- "prop_com_ens_superior"
+  # 
+  # names(test_sc)[28] <- "prop_com_energia"
+  # names(test_sc)[29] <- "prop_com_ens_superior"
   
   # excluindo variaveis correlacionadas e resposta
   
