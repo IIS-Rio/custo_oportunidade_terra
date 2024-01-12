@@ -26,7 +26,7 @@ f <- list.files(p,full.names = T)
 
 # variaveis preditoras 
 
-df <- fread(f[1]) # Amazonia
+df <- as.data.frame(fread(f[1])) # Amazonia
 
 write.csv(df,"/dados/projetos_andamento/custo_oportunidade/data_econometric_model/biomes/Amazonia_UCsTIs.csv",row.names = F)
 
