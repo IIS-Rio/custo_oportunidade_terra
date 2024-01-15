@@ -1,9 +1,15 @@
 ---
 title: "Spatial model of land value for the Brazilian territory with 1km resolution"
-author: "Francisco d’Albertas, Diogo Rocha, Eduardo Lacerda, Julia Niemeyer, Luiz Gustavo Oliveira, Renata Capelão"
+author: 
+ - Francisco d’Albertas*,
+ - Diogo Rocha,
+ - Eduardo Lacerda, 
+ - Julia Niemeyer,
+ - Luiz Gustavo Oliveira,
+ - Renata Capelão
 
         
-date: "`r format(Sys.Date() `"
+date: "`r format(Sys.Date()) `"
 output: 
   pdf_document:
     number_sections: true
@@ -11,24 +17,23 @@ output:
 bibliography: /dados/pessoal/francisco/custo_oportunidade_terra/bibliografia/co.bib
 ---
 
-\renewcommand{\figurename}{Figure}
-\renewcommand{\tablename}{Table}
 
 \begin{center}
   International Institute for Sustainability \\
-  francisco.albertas@gmail.com \\
+  *francisco.albertas@gmail.com \\
   \end{center}
 \vspace{2em}
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
 ```
 
 # Introduction
 
-The comprehensive assessment of land value has become increasingly pivotal for understanding land-use dynamics and informing sustainable land management strategies, particularly in the context of prioritization for conservation and restoration sciences (**e.g. papers IIS liderou**). Despite its importance, accurate information on land value is rarely available at finer scales or in formats easily usable in research, such as raster datasets.
+The comprehensive assessment of land value has become increasingly pivotal for understanding land-use dynamics and informing sustainable land management strategies, particularly in the context of prioritization for conservation and restoration sciences [e.g. @strassburg_global_2020; @strassburg_strategic_2019 ] . Despite its importance, accurate information on land value is rarely available at finer scales or in formats easily usable in research, such as raster datasets.
 
-Since 2019, the Brazilian Government has annually published land value data (reais $ha^{-1}$) for a substantial number of municipalities and States across all regions of the country. The provided information encompasses the following land use/cover categories: cropland with good, regular, and restricted suitability; planted pastureland; silviculture or natural pastureland; and natural vegetation. However, these data are presented in PDF format, with limited spatial coverage, hindering their application in comprehensive, nationwide studies.
+Since 2019, the Brazilian Government has annually published land value data (reais $ha^{-1}$) for a substantial number of municipalities and States across all regions of the country^[https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/vtn]. The provided information encompasses the following land use/cover categories: cropland with good, regular, and restricted suitability; planted pastureland; silviculture or natural pastureland; and natural vegetation. However, these data are presented in PDF format, with limited spatial coverage, hindering their application in comprehensive, nationwide studies.
 
 Given this context, we present a rigorous methodology that integrates advanced geospatial analyses, agricultural production estimation, and machine learning techniques to predict land values across Brazil. Leveraging annual land use/cover data and agricultural suitability information at high resolutions, together with a diverse set of socioeconomic data, the outcomes of this study promise to enrich our understanding of the spatial patterns of land values in Brazil, thereby contributing valuable insights for land use planning, natural resource management, and informed decision-making, with a specific focus on conservation and restoration sciences.
 
@@ -36,106 +41,121 @@ Given this context, we present a rigorous methodology that integrates advanced g
 # Methodological description
 ## Land value
 
-Since 2019, the Brazilian Government has annually published land value data (reais $ha^{-1}$) in PDF format for a substantial number of municipalities across all regions of the country. The provided information, encompasses the following land use/cover categories: cropland with good, regular, and restricted suitability; planted pastureland; silviculture or natural pastureland; and natural vegetation. To enhance accessibility and comparability, we standardized the data by converting it into tabular format. We amalgamated available information for the years 2019, 2021, 2022, and 2023, adjusting monetary values to 2023 by accounting for accumulated inflation based on the IPCA index from the Brazilian central bank (ref!). Owing to technical constraints, we excluded data from 2020 as it was presented in a non-convertible image format. For instances of missing information within a specific land use/cover class, we applied the mean municipality value for silviculture, planted pasture, and natural vegetation. Regarding cropland, we substituted missing values at the municipal level, prioritizing the most conservative estimate. For example, if data for good suitability cropland was absent in a municipality, we utilized information from regular suitability for input.
+The first step in our analyses was to standardize the data on land value provided by the Government by converting it from PDF into tabular format. We gathered available information for the years 2019, 2021, 2022, and 2023, adjusting monetary values to 2023 by accounting for accumulated inflation based on the he Extended National Consumer Price Index (IPCA) [@banco_central_do_brasil_calculadora_2023]. Owing to technical constraints, we excluded data from 2020 as it was presented in a non-convertible image format. For instances of missing information within a specific land use/cover class, we applied the mean municipality value for silviculture, planted pasture, and natural vegetation. Regarding cropland, we substituted missing values at the municipal level, prioritizing the most conservative estimate. For example, if data for good suitability cropland was absent in a municipality, we used information from regular suitability for input.
+
+## Land use and land cover and agricultural suitability
+
+We used 2020 land use/cover data with 30 m resolution provided by Mapbiomas [@mapbiomas_mapbiomas_2023], reclassified into the following categories (Table 1): cropland, pastureland, natural vegetation, silviculture, ignored, other natural lands. we calculated the fraction coverage for each category within a 1 km resolution grid spanning the entirety of Brazil, employing the Mollweide projection. 
+
+```{r mapbiotab, echo=FALSE, warning=FALSE,message=FALSE}
+
+#| label: mapbio
+# tabela com equivalencia de classes mapbiomas e nossas
+# Read the CSV file
+library(readxl)
+classesMapbiomas <- read_excel("/dados/pessoal/francisco/custo_oportunidade_terra/table/classesMapbiomas.xlsx")
+library(kableExtra)
+# Display the table using kable()
+kbl(classesMapbiomas, caption = "Reclassification of Mapbiomas land use/cover classes into our classes of interest to spatialize land value",booktabs = T) %>%
+ kable_styling(full_width = T)# %>%
+  # column_spec(1, width = "4cm") %>%
+  #  column_spec(2, width = "8cm")%>%
+  #  column_spec(3, width = "1cm")%>%
+  #  column_spec(4, width = "3cm")
+```
 
 
-Os dados compreendem informações em reais $ha^{-1}$, do valor da terra nua para as seguintes classes de uso da terra, **com exceção do estado do Amazonas, em que só há um valor único de VTN**: lavoura de aptitão boa, regular e restrita; pastagem plantada; silvicultura ou pastagem natural; preservação. Nos casos em que havia valores faltantes para alguma das classes para um dado município, preenchemos com o valor médio da unidade federativa no caso de silvicultura, pastagem e preservação. Para as classes de lavoura, substituímos os valores faltantes pelos valores disponíveis, utilizando quando possível o valor mais conservador (por exemplo, se o valor faltante é de lavoura de alta aptidão, favorecemos a substituição usando os valores de aptidão regular e assim por diante).
+For the spatial information regarding agricultural suitability, we relied on the work of Safanelli et al.  [-@safanelli_grain-cropping_2023], who conducted a comprehensive study modelling soil, climate, and relief suitability for agriculture. Their dataset, characterized by a 30 m resolution, was used to calculate the mean suitability per cell of our 1km grid.
 
-Finalmente, após a compilação dos dados tabulares de VTN para todos os municípios disponiveis, criamos um grid de aproximadamente 1 km, utilizando a projeção de Mollweide (Figura 2) contendo em cada celula um código identificador de cada um dos municípios para os quais há dados de VTN. 
+The integration of land use/cover data and suitability information enabled us to spatialize the land value data. This spatialized data served as the response variable in our land value model (Figure 1).
 
-## Uso e cobertura da terra e aptidão agrícola
 
-Utilizamos os dados de uso e cobertura da terra para o ano de 2020 do Mapbiomas (Projeto MapBiomas – Coleção 7 da Série Anual de Mapas de Cobertura e Uso da Terra do Brasil), reclassificados nas seguintes categorias: lavoura, pastagem, vegetação nativa, silvicultura, usos ignorados. A partir dessas classes, calculamos para uma grade de 1km, seguindo a projeção de Mollweide, a fração de cada celula ocupada por estas classes. 
-
-As informações de aptidão agrícola utilizadas foram desenvolvidas por Safanelli et al. [-@safanelli_grain-cropping_2023]. Os autores geraram camadas de aptidão climática, de solo e relevo, com 30 metros de resolução para todo o Brasil. A partir delas, calculamos a aptidão agrícola média por célula e reamostramos a camada para a mesma resoulução e projeção da camada de uso e cobertura do solo.
-
-Com as camadas de aptidão, identidade dos municipios e uso e cobertura da terra harmonizadas para a mesma projeção e resolução espacial, foi possível espacializar os dados de VTN (Figura 2).
-
-```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="50%",fig.align='center', fig.cap="Valor da terra nua disponibilizados pela receita federal para o ano de 2022, espacializados considerando aptidão agrícola e as diferentes classes de uso e cobertura do solo contidas na base de dados."}
+```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="50%",fig.align='center', fig.cap="Available land value data provided by the Brazilian Federal Government for the years 2019,2021,2022 and 2023 combined, with values updated to 2023."}
 library(raster)
 library(geobr)
 library(knitr)
-# gerando a figura
-# VTN_RF <- raster("/dados/projetos_andamento/custo_oportunidade/rasters_VTN/2022/VTN_ha_RF_agg_2022_smoothed.tif")
-# 
-# VTN_RF_df <- as.data.frame(VTN_RF, xy = TRUE)
-# 
-# 
-# Br <- read_country()
-# Br_pj <- st_transform(Br,crs(VTN_RF))
-# small_constant <- 0.0001
-# 
-# VTN_RF_p <- VTN_RF_df %>%
-#   # removendo NAs
-#   filter(!is.na(layer))%>%
-#   #filter(regiao==rg) %>%
-#   mutate(value=layer+small_constant) %>%
-#   ggplot() +
-#   geom_sf(data=Br_pj, fill="lightgray",color=NA)+
-#   geom_tile(aes(x = x, y = y, fill = value)) +
-#   scale_fill_viridis_c(option = "magma", direction = -1,
-#                        labels = comma,trans = "log10") +
-#   labs(title = paste("Valor terra nua (2022): Brasil"), fill = "R$/ha")+
-#   theme_map()+
-#   theme(text=element_text(size=7))
-# 
-# 
-# ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/VTN_RF.jpeg",plot = VTN_RF_p,width = 16,height = 18,units = "cm")
 
-include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/VTN_RF.jpeg")
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/var_resposta_MA_RF2019_2023.png")
 
 
 
 ```
 
-## Variáveis independentes
+## Independent variables
 
-A partir de uma consulta na literatura, calculamos uma série de variáveis que poderiam ser capazes de prever os valores de VTN que obtivemos da receita federal. As variaveis e a justificativa para sua utilização estão na Tabela 1, e foram baseadas em  Marques et al.[-@marques_spatial_2023] e Instituto Escolhas [@instituto_escolhas_como_2022]. Por se tratar de uma variável de cálculo mais complexo, a maneira como calculamos o valor da produção é detalhada na próxima sessão.
+We computed a series of co-variables aimed at predicting the distribution of land value across the Brazilian territory (Table 2). Notably, the determination of the production value, or the estimated value derived from agricultural and livestock activities, involved a more intricate calculation. The detailed steps for obtaining this value are detailed in the subsequent section.
 
-### Valor da produção
+### Production value
 
-Estimamos o valor da produção agrícola municipal a partir dos dados da Pesquisa Agrícola Municipal (PAM) para o ano de 2020. Para cada municipio, calculamos o valor médio da produção ponderado pela área dedicada a lavouras permanentes e temporárias. Em seguida, cruzamos essa informação com a grade de proporção de área agrícola para obter o valor da produção por área.
+We determined the agricultural production value using data sourced from Brazilian Institute of Geography and Statistics [@ibge_producao_2021]. Our methodology involved calculating the mean production in reais per hectare ($ha^{-1}$) for each Brazilian municipality weighted by the municipality's area dedicated to both temporary and permanent crops. Subsequently, we assigned a production value to each 1 km grid cell, based on the spatial location of each municipality and multiplied it by the fraction of agriculture covering the respective cell.
 
-Para a pecuária, utilizamos o valor da produção de lã, carne (incluindo todas as categorias disponíveis) e leite provenientes do censo agropecuário de 2017. Esses valores foram somados e cruzados com a camada de proporção de pastagem na grade de uso do solo, para se obter o valor da produção por área.
-
-Finalmente, para a silvicultura, realizamos um procedimento semelhante ao das culturas agrícolas, utilizando os dados de valor da produção para 2020 e a camada de uso da terra referente à silvicultura.
+A similar approach was applied to estimate livestock [@ibge_pesquisa_2021] and silviculture [@ibge_producao_2021-1] values. For livestock, we aggregated the production values of wool, beef, and milk per municipality per hectare, multiplied by the fraction of each grid cell covered with pastureland. Regarding silviculture, we utilized the production value of silviculture, multiplying it by the coverage of silviculture within each cell of the grid.
 
 ```{r echo=FALSE, warning=FALSE,message=FALSE,fig.align='center'}
 # Read the CSV file
-indep_var <- fread("/dados/pessoal/francisco/custo_oportunidade_terra/table/independente_var_table.csv")
+indep_var <- fread("/dados/pessoal/francisco/custo_oportunidade_terra/table/independente_var_table_en.csv")
 library(kableExtra)
 # Display the table using kable()
-kbl(indep_var[,c(1,2,4,5)], caption = "Variáveis preditoras usadas para ajustar o modelo preditivo de valor da terra nua.",booktabs = T) %>%
+kbl(indep_var, caption = "Independent variables used to fit our land value model",booktabs = T) %>%
  kable_styling(full_width = T) %>%
   column_spec(1, width = "4cm") %>%
    column_spec(2, width = "8cm")%>%
    column_spec(3, width = "1cm")%>%
-   column_spec(4, width = "3cm")
+   column_spec(4, width = "3cm")%>%
+    footnote("We built our table based on Instituto Escolhas(2023) and Marques et al., (2023)")
+
+#
 
 ```
 
-## Ajustando o modelo preditivo de valor da terra nua
+---
+nocite: |
+  @instituto_escolhas_como_2022, @marques_spatial_2023, @bacen_matriz_2020, @ibge_censo_2017, @ibge_censo_2010
+...
 
-Utilizamos uma abordagem de aprendizado de máquinas, ajustando uma regressão entre o VTN de 2022 como variável resposta em função das variaveis preditoras descritas na Tabela 1. Além dessas variáveis, adicionamos também a identidade das Unidades Federativas e as coordenadas X e Y ( em metros) de cada célula da grade da base de dados. 
 
-Por se tratar de uma quantidade elevada de dados de entrada -- são mais de 7 milhões de células de 1km cobrindo a extenção do território brasileiro -- segmentamos a base de dados em 5, de acordo com as regiões do país: centro-oeste, norte, sul, norte, nordeste. Essa divisão também é adequada pois considera a grande heterogeneidade entre essas regiões, contribuindo com a acurácia do modelo.
 
-Para todas as regiões, com exceção da região norte, realizamos uma amostragem estratificada considerando a área de cada município com dados de VTN disponivel, de modo a selecionar 30% das células da nossa grade. Como a região norte possui um número relativamente reduzido de municípios, nossa amostragem para ela foi de 50% das células da grade.
 
-Para cada amostra regional, separamos os dados de entrada do modelo em 2: 70% dos dados foram usados para treinamento e 30% para teste de acurácia do modelo. Em seguida, calculamos a matriz de correlação das variáveis preditoras, mantendo apenas variáveis com menos de 70% de correlação em cada região.
 
-Finalmente, ajustamos modelos *Random Forest* utilizando o pacote randomForestSRC[-@random], com 200 árvores e nós com n=20. A partir do ajuste dos modelos e avaliação de sua acurácia ($RMSE$ e $R^2$), calculamos os valores preditos de VTN para todas as células da nossa base. Nesse caso, quando havia celulas com valor "NA" nas colunas de variaveis preditoras, utilizamos o valor mediano para a região. Com os valores preditos, geramos uma imagem matricial contendo o valor da terra nua, em reais $ha^{-1}$ para todo o Brasil, para o ano de 2022.
+## Fitting a predictive model of land value
 
-# Resultados
+We employed a Random Forest approach to fine-tune a regression model, establishing a relationship between the land value data and the independent variables detailed in Table 2. To enhance efficiency, we stratified the data across the five Brazilian territories: Norte, *Nordeste*, *Sul*,*Sudeste*, and *Centro-Oeste*, considering their socioeconomic similarities to bolster model accuracy.
 
-Utilizando a base de dados de valor da terra nua (VTN) da Receita Federal e uma séride de variáveis socioeconômicas e biofísicas, fomos capazes de gerar modelos preditivos de alta acurácia (as métricas de acurácia estão descritas na Tabela 2). Com esses modelos, geramos imagens matriciais para cada região contendo em cada célula da matriz o valor predito de VTN. De modo a suavizar possiveis valores extremos, utilizamos uma abordagem de *moving-window*  para cada uma das camadas regionais, em que o valor de cada célula corresponde ao valor médio das 9 células vizinhas. Finalmente, juntamos as 5 regiões em uma imagem matricial única para o Brasil, com o valor da terra nua para 2022 (Figuras 3 e 4).
+Within each region, we conducted a stratified sample, factoring in the municipality's land value data area, selecting 30% of the dataset (except for *Nordeste* and *Norte*, where we sampled 50% due to limited coverage). Subsequently, we partitioned the data into a training set (70%) for model fitting and a testing set (30%) to assess accuracy. To streamline the model, we computed a correlation matrix among potential numeric predictive variables, incorporating only those with a correlation value below 0.7.
+
+The Random Forest models were fitted using the 'randomForestSRC' package [-@randomforest_2008] with 200 trees and nodes set to n=20. Model accuracy was evaluated through $R^{2}$ and RSME. Following model generation, we predicted land use values for all cells within our 1 km grid for each region, which were then consolidated into a unified raster for the entire country. All data handling and model fitting was done in R [@rcore]
+
+# Results
+
+Our exploration of variable correlations within each of the five Brazilian territories—*Norte*, *Nordeste*, *Sul*, *Sudeste*, and *Centro-Oeste* revealed collinearity among several variables in all regions (Figure 2). Notably, this examination guided our model refinement process, ensuring that only variables with correlation values below 0.7 were included in the final models. We removed: distance from mining sites, proportion of agriculture GDP and number of tractors (***Sul*** region); urbanization, proportion of agriculture GDP (***Sudeste***); distance from mining sites, distance to ports, HDI, agriculture subsidies, proportion of agriculture GDP, number of tractors (***Nordeste***); production value, HDI,proportion of agriculture GDP (***Centro-Oeste***); proportion of agriculture GDP, distance to ports, HDI(***Norte***). 
+
+```{r echo=FALSE,message=FALSE,warning=FALSE,fig.cap="Correlation matrixes among independent variables. Abbreviated variables are as follows:DstC500= distance to cities>500k habitants;PropPst=proportion of pastureland  ;PropAgr=proportion of agriculture;propurb=proportion of urban areas;Prpr100=proportion of properties over 100ha  ;agr2010=agriculture subsidy;PrpAGDP=proportion of agriculture GDP/total GDP;vIBGE20=production value;gdpagr=agriculture GDP; gdpprcp=GDP per capta;nmmqnrs=number of tractors;nmcpdsm=number of people employed ;cpcddrm=storage capacity;prpcmnr.=proportion of properties with power;prpcmns.=proportion of landowners with higher studies;dstrdvsf=distance to federal roads; dstrdvss= distance to state roads; dstprts=distance to ports;PrpNtVg=proportion of native vegetation;prpprpr=proportion of landowners; DstGrmp=distance to mining sites; PrpPrvd=proportion of private lands; IDH2010= Human development index. For more details on the variables, refer to Table 2."}
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/corrpolots.png")
+
+```
+
+
+The Random Forest models exhibited remarkable accuracy across all regions, with consistently high R-squared values and low Root Mean Square Error (RMSE) (Table 2). The models achieved $R^2$ values exceeding 0.8, highlighting their robust ability to explain the variance in land values, and RMSE below 2. Our choice of tree number was also adequate and allowed fast processing with high accuracy (Figure 3).
+
+```{r echo=FALSE,warning=FALSE,message=FALSE,fig.cap="Error rate estimation for the regional models."}
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/error.png")
+
+```
+
+
+Variable importance analysis provided additional insights into the factors driving land value predictions. **Key variables, such as agricultural production estimates, land use/cover categories, and socioeconomic indicators, consistently emerged as significant contributors. Discuss for each region the main variables** (**Figure x – varimp!**)
+
+The application of our Random Forest models to extrapolate land values across Brazil resulted in detailed spatial predictions for each region. **Figure 3** presents the extrapolated land values for each territory, providing a visual representation of the spatial distribution predicted by our models. These extrapolated values were subsequently mosaiced into a unified raster, offering a comprehensive nationwide overview of land values (**Figure 4**).
+
 
 ```{r echo=FALSE, warning=FALSE,message=FALSE,fig.align='center'}
 # Read the CSV file
 acuracia <- fread("/dados/pessoal/francisco/custo_oportunidade_terra/table/acuracia.csv")
 library(kableExtra)
 # Display the table using kable()
-kbl(acuracia, caption = "Medidas de acurácia dos modelos regionais.",booktabs = T) %>%
+kbl(acuracia, caption = "Evaluation of the perfomance of our regional models",booktabs = T) %>%
  kable_styling(full_width = T) 
 
 ```
@@ -155,11 +175,11 @@ include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/regi
 ```
 
 
-# Referências bibliográficas
+# References
 
 <div id="refs"></div>
 
-# Observações {-}
+# Observations {-}
 
 Todos os dados utilizados para ajustar os modelos são de uso público e estão referenciados ao longo do documento.
 

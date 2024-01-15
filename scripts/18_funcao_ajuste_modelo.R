@@ -14,6 +14,18 @@ vtn_predict <- function(reg){
   
   #-----------------------------------------------------------------------------
   
+  # lendo response
+  
+  response <- fread("/dados/projetos_andamento/custo_oportunidade/data_econometric_model/response_updated_regreen.csv")
+  response$y <- round(response$y)
+  response$x <- round(response$x)
+  reg <- left_join(reg,response)
+  
+  # elimina x e y
+  reg  <- reg %>%
+    as_tibble() %>%
+    dplyr::select(-c("x", "y"))
+  
   
   # define fracao amostragem do modelo (varia de regiao pra regiao)
     
@@ -214,13 +226,14 @@ vtn_predict <- function(reg){
   
   # pra calcular erro por arvore precisa da opcao block.size=1! 
   
-  rfModel_full <- rfsrc(formula = formula_full_updated , data = as.data.frame(train_sc), ntree = 400,nodesize = 20,block.size = 1)
+  rfModel_full <- rfsrc(formula = formula_full_updated , data = as.data.frame(train_sc), ntree = 200,nodesize = 20,block.size = 1)
   
   actual <- log(test_sc$vtn)
   test_sc$VTN_log <- log(test_sc$vtn)
   # mantendo apenas as mesmas colunas!
   #test_sc2 <- as.data.frame(test_sc)
   #test_sc2 <- test_sc %>% select(names(train_sc))
+  names(test_sc) <- names(train_sc)
   predicted <- predict(object = rfModel_full, newdata = test_sc)
   r_full <- caret::R2(pred = predicted$predicted,obs = actual) 
   r_rmse <- caret::RMSE(pred = predicted$predicted,obs = actual)
