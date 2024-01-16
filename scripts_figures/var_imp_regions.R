@@ -41,7 +41,9 @@ for(i in seq_along(f)){
   
   err <- plot(gg_error(rfModel_full$model))+
     theme_bw()+
-    ggtitle(reg_name)
+    ggtitle(reg_name, subtitle = element_text(size = 10))+
+    theme(text = element_text(size = 7)
+          )+
   
   err_list[[i]] <- err 
   #rfModel_no_xy <- vtn_predict(reg=df_noxy) # sem xy
@@ -103,18 +105,33 @@ varimp_df <- do.call(rbind,varimp_df)
 
 
 
-nms <- c("Agr.prop.","Prop.properties>100ha","Dist.ports","Dist.Citiesover500k","Gdp_per_capita","Urbanization","Prop.power","Climate","Storage capacity","N.employed","N.tractors","Gdp_agr","Landowner proportion","Prop.highereduc","Natveg.prop.","Agri.credit","Past.prop.","Dist.mining","Dist.fed.roads","Soil","dist.state.roads","Priv.ownership","Relief","Prod.val.","agressions","conflicts","DistUCskm","DistITskm","HDI")
+nms <- c("Agr.prop.","Prop.properties>100ha","Dist.ports","Prop.power","Gdp_per_capita","Urbanization","Climate","Dist.Citiesover500k","N.tractors","Storage capacity","N.employed","Prop.highereduc","Landowner proportion","Gdp_agr","Natveg.prop.","Agri.credit","Past.prop.","Dist.mining","Dist.fed.roads","Soil","dist.state.roads","Priv.ownership","Relief","Prod.val.","agressions","conflicts","DistUCskm","DistITskm","HDI")
 
-names2correct =data.frame(nms=unique(varimp_df$vars),corrnms=nms)
+names2correct =data.frame(vars=unique(varimp_df$vars),corrnms=nms)
+
+varimp_df2 <- left_join(varimp_df,names2correct)
+
+regions <- unique(varimp_df2$region)
+
+lst_varimp <- list()
+for(reg in seq_along(regions)){
+  df <- varimp_df2%>%filter(region==regions[reg])
+  plotvarimp <- ggplot(df, aes(x = reorder(corrnms, vimp), y = vimp))+
+    geom_bar(stat = "identity", position = "dodge",fill = "lightblue") +
+    theme_bw()+
+    labs(y = "Importance",x="")+
+    theme(text = element_text(size = 7))+
+    ggtitle("Mata Atlântica") +
+    coord_flip()+
+    ggtitle(regions[reg])
+ lst_varimp[[reg]] <- plotvarimp
+}
 
 
-plotvarimp <- ggplot(varimp_df, aes(x = vars, y = vimp))+
-  geom_bar(stat = "identity", fill = "lightblue") +
-  theme_classic()+
-  labs(y = "Importance",x="")+
-  theme(text = element_text(size = 7))+
-  ggtitle("Mata Atlântica") +
-  coord_flip()
+panel_vimp <- ggarrange(plotlist = lst_varimp)
+
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/vimp.png",width = 16,height = 10,units = "cm", dpi = 150, bg = "white",plot = panel_vimp)
+
 # 
 # plotAM <- ggplot(varimp_AM2, aes(x = vars, y = vimp))+
 #   geom_bar(stat = "identity", fill = "lightblue") +
