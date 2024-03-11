@@ -41,7 +41,7 @@ Given this context, we present a rigorous methodology that integrates advanced g
 # Methodological description
 ## Land value
 
-The first step in our analyses was to standardize the data on land value provided by the Government by converting it from PDF into tabular format. We gathered available information for the years 2019, 2021, 2022, and 2023, adjusting monetary values to 2023 by accounting for accumulated inflation based on the he Extended National Consumer Price Index (IPCA) [@banco_central_do_brasil_calculadora_2023]. Owing to technical constraints, we excluded data from 2020 as it was presented in a non-convertible image format. For instances of missing information within a specific land use/cover class, we applied the mean municipality value for silviculture, planted pasture, and natural vegetation. Regarding cropland, we substituted missing values at the municipal level, prioritizing the most conservative estimate. For example, if data for good suitability cropland was absent in a municipality, we used information from regular suitability for input.
+The first step in our analyses was to standardize the data on land value provided by the Government by converting it from PDF into tabular format. We gathered available information for the years 2019, 2021, 2022, and 2023, adjusting monetary values to 2023 by accounting for accumulated inflation based on the Extended National Consumer Price Index (IPCA) [@banco_central_do_brasil_calculadora_2023]. Owing to technical constraints, we excluded data from 2020 as it was presented in a non-convertible image format. For instances of missing information within a specific land use/cover class, we applied the mean municipality value for silviculture, planted pasture, and natural vegetation. Regarding cropland, we substituted missing values at the municipal level, prioritizing the most conservative estimate. For example, if data for good suitability cropland was absent in a municipality, we used information from regular suitability for input.
 
 ## Land use and land cover and agricultural suitability
 
@@ -93,7 +93,7 @@ A similar approach was applied to estimate livestock [@ibge_pesquisa_2021] and s
 
 ```{r echo=FALSE, warning=FALSE,message=FALSE,fig.align='center'}
 # Read the CSV file
-indep_var <- fread("/dados/pessoal/francisco/custo_oportunidade_terra/table/independente_var_table_en.csv")
+indep_var <- fread("/dados/pessoal/francisco/custo_oportunidade_terra/table/independente_var_table_en2.csv",sep = ";")
 library(kableExtra)
 # Display the table using kable()
 kbl(indep_var, caption = "Independent variables used to fit our land value model",booktabs = T) %>%
@@ -110,7 +110,7 @@ kbl(indep_var, caption = "Independent variables used to fit our land value model
 
 ---
 nocite: |
-  @instituto_escolhas_como_2022, @marques_spatial_2023, @bacen_matriz_2020, @ibge_censo_2017, @ibge_censo_2010
+  @instituto_escolhas_como_2022, @marques_spatial_2023, @bacen_matriz_2020, @ibge_censo_2017, @ibge_censo_2010, @imaflora_atlas_2020
 ...
 
 
