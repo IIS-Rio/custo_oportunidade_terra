@@ -95,7 +95,7 @@ reg <- c("Centro Oeste","Nordeste","Norte","Sudeste","Sul")
 varimp_df <-lapply(varimp_list,fread)
 
 for(i in seq_along(varimp_df)){
-  varimp_df[[i]]$region <- reg[i]
+  varimp_df[[i]]$region <- reg_eng[i]
 }
 
 varimp_df <- do.call(rbind,varimp_df)
@@ -127,9 +127,9 @@ for(reg in seq_along(regions)){
 }
 
 
-panel_vimp <- ggarrange(plotlist = lst_varimp)
+panel_vimp <- ggarrange(plotlist = lst_varimp, ncol=2,nrow = 3)
 
-ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/vimp.png",width = 16,height = 10,units = "cm", dpi = 150, bg = "white",plot = panel_vimp)
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/vimpv02.png",width = 12,height = 18,units = "cm", dpi = 150, bg = "white",plot = panel_vimp)
 
 # 
 # plotAM <- ggplot(varimp_AM2, aes(x = vars, y = vimp))+
