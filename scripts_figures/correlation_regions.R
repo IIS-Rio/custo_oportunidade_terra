@@ -25,7 +25,7 @@ p <- "/dados/projetos_andamento/custo_oportunidade/data_econometric_model/regioe
 # listando
 
 f <- list.files(p,full.names = T) 
-
+reg_eng <- c("Central-West", "Northeast", "North", "Southeast", "South")
 dfs <- lapply(f,fread) 
 
 #loop
@@ -110,19 +110,21 @@ for(i in seq_along(dfs)){
 
   # tem variaveis correlacionadas X tem uma q eh 0.70 com garimpo
   reg <- unique(df$nam_rgn)
-  corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower", outline.color = "black",digits = 3)+ggtitle(reg)+
+  reg_eng_p <- reg_eng[i]
+  corplot <- ggcorrplot(cor_mat, hc.order = TRUE, type = "lower", outline.color = "black",digits = 3)+ggtitle(reg_eng_p)+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 
   # Change the font size within ggcorrplot
   corplot <- corplot +
     theme(
-      text = element_text(size = 7), # Change font size of all text
-      axis.text.x = element_text(size = 7), # Change font size of axis text
+      text = element_text(size = 6), # Change font size of all text
+      axis.text.x = element_text(size = 6), # Change font size of axis text
       #axis.tit.xle = element_text(size = 7), # Change font size of axis titles
-      plot.title = element_text(size = 7), # Change font size of plot title
-      axis.text.y = element_text(size = 7)
-      )
+      plot.title = element_text(size = 6), # Change font size of plot title
+      axis.text.y = element_text(size = 6)
+      )+ 
+    theme(plot.margin = margin(5, 5, 5, 0))
 
 
 list_plots[[i]] <- corplot
@@ -130,9 +132,8 @@ list_plots[[i]] <- corplot
 }
 
 
-panel <- ggarrange(plotlist = list_plots,common.legend = T)
+panel <- ggarrange(plotlist = list_plots,common.legend = T, ncol=2, nrow=3)
 
 
-ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/corrpolots.png",width = 18,height = 18,units = "cm", dpi = 150, bg = "white",plot = panel)
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/corrpolotsv02.png",width = 16,height = 20,units = "cm", dpi = 150, bg = "white",plot = panel)
 
-names(df)
