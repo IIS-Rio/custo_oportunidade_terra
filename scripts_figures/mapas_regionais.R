@@ -51,7 +51,7 @@ rs <- list.files(p,full.names = T,pattern = "v2")
 
 lista_df <- list()
 
-regioes <- c("centro-oeste","nordeste","norte","sudeste","sul")
+regioes <-c("Central-West", "Northeast", "North", "Southeast", "South")
 
 for (i in 1:length(regioes)){
   
@@ -69,16 +69,21 @@ for (i in 1:length(regioes)){
 
 VTN_pred_df_combinado <- do.call(rbind,lista_df)
 
-small_constant <- 0.0001
+# small_constant <- 0.0001
+# 
+# my_palette <- scale_fill_gradientn(
+#   colors = c("gray", "orange", "yellow", "darkgreen"),
+#   name = "R$/ha",
+#   breaks = c(200, 2000, 20000),  # Specify the desired break points
+#   labels = comma,
+#   trans = "log10"
+# )
 
-my_palette <- scale_fill_gradientn(
-  colors = c("gray", "orange", "yellow", "darkgreen"),
-  name = "R$/ha",
-  breaks = c(200, 2000, 20000),  # Specify the desired break points
-  labels = comma,
-  trans = "log10"
-)
 
+breaks <- c(seq(0,20000,3000),24000,30000,50000,Inf)
+labels <- c("900-3,000","3,000-6,000","6,000-9,000","9,000-12,000","12,000-15,000","15,000-18,000","18,000-24,000","24,000-30,000","30,000-50,000",">50.000")
+VTN_pred_df_combinado$category <- cut(VTN_pred_df_combinado$vtn, breaks = breaks, labels = labels, include.lowest = TRUE, right = FALSE)
+category_colors <- viridis(length(labels))
 
 Br <- read_country()
 Br_pj <- st_transform(Br,crs(rast(rs[[1]])))
@@ -93,14 +98,18 @@ for(rg in regioes){
   
   VTN_pred_p <- VTN_pred_df_combinado %>%
     filter(regiao==rg) %>%
-    mutate(value=vtn+small_constant) %>%
+    mutate(value=category) %>%
     ggplot() +
     geom_sf(data=Br_pj, fill="lightgray",color=NA)+
     geom_tile(aes(x = x, y = y, fill = value)) +
-    my_palette+
+    #my_palette+
+    scale_fill_manual(values = category_colors)+
     labs(title = rg, fill = "R$/ha")+
     theme_map()+
-    theme(text=element_text(size=7))
+    theme(text=element_text(size=6))+
+    theme(
+      #legend.position = "none"
+      legend.direction = "horizontal")
   regioes_plot[[c]] <- VTN_pred_p
   c=c+1
 }
@@ -128,13 +137,13 @@ for(rg in regioes){
 # 
 # regioes_plot[[6]] <- VTN_pred_p_br
 # 
-regioes_plot[[1]]
-regioes_plot[[2]]
+# Extract legend from the complete plot
+legend <- get_legend(VTN_pred_p)
 
-pannel <- ggarrange(plotlist = regioes_plot,common.legend = T)
+pannel <- ggarrange(plotlist =regioes_plot, ncol=2,nrow=3, legend.grob = legend)
+#pannel2 <- ggarrange(legend,pannel,nrow=2,ncol=1,heights = c(1,10))
 
-
-ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/regional_VTN.png",plot = pannel,width = 18,height = 12,units = "cm",dpi = 200)
+ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/regional_VTNv02.png",plot = pannel,width = 18,height = 20,units = "cm",dpi = 700)
   
   
 ggsave(filename = "/dados/pessoal/francisco/custo_oportunidade_terra/figures/regional_VTN_Br.jpeg",plot = VTN_pred_p_br,width = 16,height = 18,units = "cm")
