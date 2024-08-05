@@ -7,6 +7,9 @@ author:
  - Julia Niemeyer,
  - Luiz Gustavo Oliveira,
  - Renata Capelão
+ - Bruna Fatiche Pavani
+ - Juliana Almeida-Rocha
+ - Rafael Loyola
 
         
 date: "`r format(Sys.Date()) `"
@@ -19,8 +22,9 @@ bibliography: /dados/pessoal/francisco/custo_oportunidade_terra/bibliografia/co.
 
 
 \begin{center}
-  International Institute for Sustainability \\
-  *francisco.albertas@gmail.com \\
+  Authors’ affiliation: International Institute for Sustainability \\
+  Leading author email: *francisco.albertas@gmail.com \\
+  Institutional email address for correspondence: plangea@iis-rio.org  
   \end{center}
 \vspace{2em}
 
@@ -70,12 +74,13 @@ For the spatial information regarding agricultural suitability, we relied on the
 The integration of land use/cover data and suitability information enabled us to spatialize the land value data. This spatialized data served as the response variable in our land value model (Figure 1).
 
 
-```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="50%",fig.align='center', fig.cap="Available land value data provided by the Brazilian Federal Government for the years 2019,2021,2022 and 2023 combined, with values updated to 2023."}
+```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="100%",fig.align='center', fig.cap="Available land value data provided by the Brazilian Federal Government for the years 2019,2021,2022 and 2023 combined, with values updated to 2023. The gray shade represents areas where there were no data available."}
+
 library(raster)
 library(geobr)
 library(knitr)
 
-include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/var_resposta_MA_RF2019_2023.png")
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/var_resposta_MA_RF2019_2023_v02.png")
 
 
 
@@ -119,28 +124,28 @@ nocite: |
 
 ## Fitting a predictive model of land value
 
-We employed a Random Forest approach to fine-tune a regression model, establishing a relationship between the land value data and the independent variables detailed in Table 2. To enhance efficiency, we stratified the data across the five Brazilian territories: Norte, *Nordeste*, *Sul*,*Sudeste*, and *Centro-Oeste*, considering their socioeconomic similarities to bolster model accuracy.
+We employed a Random Forest approach to fine-tune a regression model, establishing a relationship between the land value data and the independent variables detailed in Table 2. To enhance efficiency, we stratified the data across the five Brazilian territories: North (*Norte*), Northeast (*Nordeste*), South (*Sul*), Southeast (*Sudeste*), and Central-West (*Centro-Oeste*), considering their socioeconomic similarities to bolster model accuracy (original Portuguese names in  parentheses).
 
-Within each region, we conducted a stratified sample, factoring in the municipality's land value data area, selecting 30% of the dataset (except for *Nordeste* and *Norte*, where we sampled 50% due to limited coverage). Subsequently, we partitioned the data into a training set (70%) for model fitting and a testing set (30%) to assess accuracy. To streamline the model, we computed a correlation matrix among potential numeric predictive variables, incorporating only those with a correlation value below 0.7.
+Within each region, we conducted a stratified sample, factoring in the municipality's land value data area, selecting 30% of the dataset (except for Northeast and North, where we sampled 50% due to limited coverage). Subsequently, we partitioned the data into a training set (70%) for model fitting and a testing set (30%) to assess accuracy. To streamline the model, we computed a correlation matrix among potential numeric predictive variables, incorporating only those with a correlation value below 0.7.
 
 The Random Forest models were fitted using the 'randomForestSRC' package [-@randomforest_2008] with 200 trees and nodes set to n=20. Model accuracy was evaluated through $R^{2}$ and RSME. Following model generation, we predicted land use values for all cells within our 1 km grid for each region, which were then consolidated into a unified raster for the entire country. All data handling and model fitting was done in R [@rcore]
 
 # Results
 
-Our exploration of variable correlations within each of the five Brazilian territories—*Norte*, *Nordeste*, *Sul*, *Sudeste*, and *Centro-Oeste* revealed collinearity among several variables in all regions (Figure 2). Notably, this examination guided our model refinement process, ensuring that only variables with correlation values below 0.7 were included in the final models. We removed: distance from mining sites, proportion of agriculture GDP and number of tractors (***Sul*** region); urbanization, proportion of agriculture GDP (***Sudeste***); distance from mining sites, distance to ports, HDI, agriculture subsidies, proportion of agriculture GDP, number of tractors (***Nordeste***); production value, HDI,proportion of agriculture GDP (***Centro-Oeste***); proportion of agriculture GDP, distance to ports, HDI(***Norte***). 
+Our exploration of variable correlations within each of the five Brazilian territories revealed collinearity among several variables in all regions (Figure 2). Notably, this examination guided our model refinement process, ensuring that only variables with correlation values below 0.7 were included in the final models. We removed: distance from mining sites, proportion of agriculture GDP and number of tractors (South region); urbanization, proportion of agriculture GDP (Southeast); distance from mining sites, distance to ports, HDI, agriculture subsidies, proportion of agriculture GDP, number of tractors (Northeast); production value, HDI,proportion of agriculture GDP (central-West); proportion of agriculture GDP, distance to ports, HDI(North). 
 
-```{r echo=FALSE,message=FALSE,warning=FALSE,fig.cap="Correlation matrixes among independent variables. Abbreviated variables are as follows:DstC500= distance to cities>500k habitants;PropPst=proportion of pastureland  ;PropAgr=proportion of agriculture;propurb=proportion of urban areas;Prpr100=proportion of properties over 100ha  ;agr2010=agriculture subsidy;PrpAGDP=proportion of agriculture GDP/total GDP;vIBGE20=production value;gdpagr=agriculture GDP; gdpprcp=GDP per capta;nmmqnrs=number of tractors;nmcpdsm=number of people employed ;cpcddrm=storage capacity;prpcmnr.=proportion of properties with power;prpcmns.=proportion of landowners with higher studies;dstrdvsf=distance to federal roads; dstrdvss= distance to state roads; dstprts=distance to ports;PrpNtVg=proportion of native vegetation;prpprpr=proportion of landowners; DstGrmp=distance to mining sites; PrpPrvd=proportion of private lands; IDH2010= Human development index. For more details on the variables, refer to Table 2.",fig.align='center'}
+```{r echo=FALSE,message=FALSE,warning=FALSE,fig.cap="Correlation matrixes among independent variables. Abbreviated variables are as follows: DstC500 = distance to cities > 500k habitants; PropPst = proportion of pastureland  ; PropAgr = proportion of agriculture; propurb = proportion of urban areas; Prpr100 = proportion of properties over 100ha; agr2010 = agriculture subsidy; PrpAGDP = proportion of agriculture GDP/total GDP; vIBGE20 = production value; gdpagr = agriculture GDP; gdpprcp = GDP per capta; nmmqnrs = number of tractors; nmcpdsm = number of people employed; cpcddrm = storage capacity; prpcmnr. = proportion of properties with power; prpcmns.= proportion of landowners with higher studies; dstrdvsf = distance to federal roads; dstrdvss = distance to state roads; dstprts = distance to ports; PrpNtVg = proportion of native vegetation; prpprpr = proportion of landowners; DstGrmp = distance to mining sites; PrpPrvd = proportion of private lands; IDH2010 = Human development index. For more details on the variables, refer to Table 2.",fig.align='center'}
 
-include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/corrpolots.png")
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/corrpolotsv02.png")
 
 ```
 
 
-The Random Forest models exhibited remarkable accuracy across all regions, with consistently high R-squared values and low Root Mean Square Error (RMSE) (Table 2). The models achieved $R^2$ values exceeding 0.8, highlighting their robust ability to explain the variance in land values, and RMSE below 2. Our choice of tree number was also adequate and allowed fast processing with high accuracy (Figure 3).
+The Random Forest models exhibited remarkable accuracy across all regions, with consistently high R-squared values and low Root Mean Square Error (RMSE) (Table 2). The models achieved $R^2$ values exceeding 0.9, highlighting their robust ability to explain the variance in land values, and RMSE below 2, underling the accuracy in predicting land values.  The outcomes of my model could suggest potential overfitting. However, this is not a concern in this context, as the model is being used to interpolate values and fill missing data within the same region from which the data originates. The model is not being used to predict values in unsampled regions, but rather to provide complete coverage of the existing dataset. Our choice of tree number was also adequate and allowed fast processing with high accuracy (Figure 3).
 
 ```{r echo=FALSE,warning=FALSE,message=FALSE,fig.cap="Error rate estimation for the regional models.",fig.align='center'}
 
-include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/error.png")
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/errorv02.png")
 
 ```
 
@@ -157,36 +162,50 @@ kbl(acuracia, caption = "Evaluation of the perfomance of our regional models",bo
 
 Variable importance analysis provided additional insights into the factors driving land value predictions. Key variables, such as agricultural production value estimates, land use/cover categories, and socioeconomic indicators, consistently emerged as significant contributors. (Figure 4).
 
-```{r echo=FALSE,warning=FALSE,message=FALSE,fig.align='center',fig.cap="Relative importance of the independent variable in our regional models. The importance of all variables summed equals to one."}
+```{r echo=FALSE,warning=FALSE,message=FALSE,fig.align='center', ,fig.cap="Relative importance of the independent variable in our regional models. The importance of all variables summed equals to one. Abreviated variables: Agr.prop. = Agriculture proportion; Prop.propertiesgreater100ha = Proportion properties greater than 100 ha."}
 
-include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/vimp.png")
+# ,fig.cap="Relative importance of the independent variable in our regional models. The importance of all variables summed equals to one. Abreviated variables: Agr.prop. = Agriculture proportion, Prop.propertiesgreater100ha = Proportion properties greater than 100 ha, Dist.ports = Distance to ports, Prop.power = Proportion power; Dist.Citiesover500k = Distance to cities, N.tractors = Number of tractors, N.employed = Number of people employed, Prop.highereduc = Proportion higher education, Gdp_agr = Proportion agricultureGDP, Natveg.prop. = Natural land proportion , Agri.credit = Agriculture credit, Past.prop. = Pasture proportion, Dist.mining = Distance to mining sites, Dist.fed.roads = Distance to Federal roads, dist.state.roads = Distance to State roads, Priv.ownership = Proportion of private lands, Prod.val. = Production value, DistUCskm = Distance to UCs, DistITskm = Distance to TIs. For more details on the variables, refer to Table 2."
+
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/vimpv02.png")
 
 
 ```
 
 
-The application of our Random Forest models to extrapolate land values across Brazil resulted in detailed spatial predictions for each region. Figure 5 presents the extrapolated land values for each territory, providing a visual representation of the spatial distribution predicted by our models. These extrapolated values were subsequently mosaiced into a unified raster, offering a comprehensive nationwide overview of land values (Figure 6).
+Applying our Random Forest models to extrapolate land values across Brazil resulted in detailed spatial predictions for each region. We extrapolated the land values for each region, providing a visual representation of the spatial distribution predicted by our models (Figure 5). These extrapolated values were subsequently mosaiced into a unified raster, offering a comprehensive nationwide overview of land values (Figure 6).
+
+The creation of a spatially explicit raster layer of land value for the Brazilian territory at a 1km resolution, based on Brazilian Goverment official data and relevant covariables, provides significant advantages over traditional PDF reports with incomplete coverage. This comprehensive layer allows for a uniform and continuous assessment of land values across the entire country, facilitating better-informed decision-making in spatial planning and resource allocation. The use of covariables enhances the model's accuracy and extrapolation capabilities, capturing the intricate variations in land value influenced by multiple factors.
+
+However, this approach is not without limitations. One notable challenge is the lack of available land value data for certain regions, which can affect the model's accuracy in those areas. Additionally, the values provided by municipalities or states tend to be underestimated since they are often calculated for tax purposes, which may not reflect the true market value. Nonetheless, this issue is likely uniformly distributed across regions, minimizing any significant spatial bias.
+
+Despite these limitations, the raster layer serves as a valuable asset for indicating relative land value across Brazil. While the absolute values should be interpreted with caution, the relative information is instrumental in identifying areas of higher or lower land value. This insight is particularly useful for spatial planning, enabling researchers and stakeholders to make more strategic decisions regarding development and conservation. 
 
 
 ```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="100%",fig.align='center', fig.cap="Predicted land value for Brazilian regions."}
 
 
-include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/regional_VTN.png")
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/regional_VTNv02.png")
 
 ```
 
-```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="90%",fig.align='center', fig.cap="Predicted land value for the Brazilian territory with 1km resolution"}
+```{r echo=FALSE, message=FALSE,warning=FALSE,out.width="100%",fig.align='center', fig.cap="Predicted land value for the Brazilian territory with 1km resolution"}
 
 
-include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/predicted_BR.png")
+include_graphics("/dados/pessoal/francisco/custo_oportunidade_terra/figures/report/predicted_BRv02.png")
 
 ```
 
+# Observations {-}
+
+All data used to build the models are publicly available.
+
+# Additional details  {-}
+
+Related works 
+
+[preprint]
 
 # References
 
 <div id="refs"></div>
 
-# Observations {-}
-
-All data used to build the models are publicly available.
